@@ -3,6 +3,8 @@
 // but gameplay runs on the project's own authoritative sim (src/game/sim.js) rendered
 // through the project's own 3D assets (src/assets/*). No Canvas-2.5D renderer here.
 import { bootMatch } from "./src/game/engine.js";
+import { bootLobbyPreview } from "./src/game/lobbyPreview.js";
+import { SFX } from "./src/game/sfx.js";
 import { makeRoom, addPlayer, startRound, step, pass, input, PASS_RANGE } from "./src/game/sim.js";
 import { isNetworked, createNetworkedMatch, createRoomApi, serverReachable, serverUrl } from "./src/net/index.js";
 import { createWallet, truncateAddress, MONAD_TESTNET, friendlyWalletError } from "./src/web3/wallet.js";
@@ -21,6 +23,7 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
   const state = {
     screen: "home", nick: "RUSHER", players: 4, credits: 100, bot: true,
     code: "RUSH42", ready: false, lobbyDeadline: 0, countdown: false,
+    bet: 0, betInput: "", // MON bet for seat 0; typed value kept here so a re-render can't wipe it
     game: null, // {room, avatars, api,...} once arena is up
     paused: false, soundOn: true,
     // networked mode (?net=1 / localStorage.netMode): null until a room exists
@@ -54,7 +57,9 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
   }
 
   // ==== navigation (same screen choreography, Indonesian copy) ====
-  const ROUTES = { home: "/", create: "/rooms/create", lobby: "/room/" + state.code, arena: "/match", result: "/results" };
+  // lobby reads state.code lazily — freezing it at boot pinned the URL to the
+  // seed code even after "BUAT ROOM" generated a new one
+  const ROUTES = { home: "/", create: "/rooms/create", get lobby() { return "/room/" + state.code; }, arena: "/match", result: "/results" };
   function navigate(next) {
     state.screen = next;
     document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("on", s.id === "screen-" + next));
@@ -71,7 +76,15 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
     if (next === "lobby" && !state.netRoom && state.netMode) {
       prepareNetRoom().then((ok) => { if (ok) { renderLobby(); if (state.funded) refreshDepositors(); } });
     }
+    // leaving the match stops its loop and music — otherwise arcade_chase keeps
+    // playing underneath the menu bed (engine.stop keeps the renderer for reuse)
+    if (next !== "arena") leaveArena();
+    syncPreview(next);
+    menuMusic(MENU_SCREENS.includes(next));
   }
+
+  // crossing the 768px breakpoint toggles the panel without a navigation
+  matchMedia("(min-width: 769px)").addEventListener("change", () => syncPreview(state.screen));
 
   // ==== toast (both lobby and in-arena) ====
   let toastTimer = 0;
@@ -125,9 +138,55 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
   // ==== lobby seat list ====
   // Two render paths share one markup:
   //   funded  - every seat's state comes from the server roster (kind,
-  //             walletAddress, escrowStatus). A seat without a verified deposit
-  //             can never be shown ready.
+  //             walletAddress, funded, escrowStatus). A seat without a verified
+  //             deposit can never be shown ready.
   //   demo    - the original local illustration, honestly labelled as such.
+  //
+  // The audit_fe branch added its own EIP-1193 "wallet gate" and a bet form that
+  // only recorded a number locally. Both are superseded by src/web3/ on this
+  // branch, which signs real escrow deposits; keeping them would have shipped a
+  // second, non-functional wallet path next to the working one.
+
+  // ==== menu music — lobby_chill on home/create/lobby; the arena keeps arcade_chase ====
+  const MENU_SCREENS = ["home", "create", "lobby"];
+  let menuSfx = null; // built after the first gesture — autoplay would be blocked
+  function menuMusic(on) {
+    if (!menuSfx || !on || !state.soundOn) { menuSfx?.stopMusic(); return; }
+    menuSfx.music("lobby_chill");
+  }
+  const unlock = () => {
+    removeEventListener("pointerdown", unlock);
+    removeEventListener("keydown", unlock);
+    menuSfx = SFX({ on: state.soundOn });
+    menuMusic(MENU_SCREENS.includes(state.screen));
+  };
+  addEventListener("pointerdown", unlock);
+  addEventListener("keydown", unlock);
+
+  // ==== gameplay preview — one panel + one WebGL context, parked into the
+  // .preview-slot of whichever screen is showing (create and lobby share it) ====
+  const PREVIEW_SCREENS = ["create", "lobby"];
+  let preview = null;
+  function syncPreview(next) {
+    // slots are display:none on mobile, so the context is never created there
+    const wide = matchMedia("(min-width: 769px)");
+    const slot = wide.matches && PREVIEW_SCREENS.includes(next) ? $("screen-" + next).querySelector(".preview-slot") : null;
+    const panel = $("previewPanel");
+    if (slot) slot.appendChild(panel);
+    panel.hidden = !slot;
+    if (slot && !preview) preview = bootLobbyPreview($("lbPreview"));
+    preview?.setActive(!!slot);
+  }
+
+  // The audit_fe branch put a "bet" form here that only stored a number in
+  // memory and toasted "menunggu backend mengirim tx". No transaction was ever
+  // created. The funded path on this branch is the real one: the host's
+  // createRoom call in src/web3/escrow.js, and the join button that follows a
+  // verified deposit. A second form that accepts a MON figure and does nothing
+  // is exactly the kind of UI that makes a demo look like it took money when it
+  // did not, so it is removed rather than wired.
+
+  // ==== lobby seat list (same render as reference, honest local-mock labels) ====
   function escapeHTML(x) { return String(x).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c])); }
 
   function seatMarkup({ name, initial, color, you, sub, fund, status, cls }) {
@@ -309,7 +368,7 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
     state.lobbyDeadline = Date.now() + 15000;
     state.countdown = true;
     renderLobby();
-    toast("Squad siap. Match mulai dalam 15 detik!");
+    toast("Squad siap. Bom mulai dalam 15 detik.");
   }
 
   // ==== lobby 15 s countdown (drives both countdown tiles + auto start) ====
@@ -338,7 +397,7 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
       $("lbCountTitle").textContent = "ARENA MULAI DALAM";
       $("lbCount").textContent = String(Math.ceil(left)).padStart(2, "0");
       $("lbCountHint").textContent = "kursi terkunci · semua kursi dianggap siap";
-      if (left <= 0) { state.lobbyDeadline = 0; state.countdown = false; enterArena(); }
+      if (left <= 0) { state.lobbyDeadline = 0; state.countdown = false; gateArena(); }
     }
     if (state.screen === "arena") gameTick();
     if (state.screen === "lobby" && state.funded) pollFundedLobby();
@@ -347,6 +406,29 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
   setTimeout(lobbyTick, 100);
 
   // ==== arena session ====
+  // every entry point (ready countdown, SKIP TO MATCH) lands here. An already
+  // connected wallet goes straight in; otherwise we try the real wallet module
+  // from src/web3/ and fall back to the local demo when there is none, so a
+  // walletless practice match still works.
+  function gateArena() {
+    state.lobbyDeadline = 0;
+    state.countdown = false;
+    // `const` declarations later in this scope are in the temporal dead zone
+    // here, so this must not reference `hasWallet`/`w`. It is only ever called
+    // from a click handler or timer, long after module init, but keeping the
+    // reference cheap and local avoids a future reorder turning it into a TDZ
+    // crash on the first frame.
+    if (state.wallet?.getAddress?.()) { enterArena(); return; }
+    if (!state.escrowAddress) { enterArena(); return; }
+    state.wallet
+      .connect()
+      .then(() => { walletPill(); enterArena(); })
+      .catch(() => {
+        // No provider, user cancelled, or wrong chain: do not block the demo.
+        toast("Jalan tanpa wallet — mode latihan lokal.");
+        enterArena();
+      });
+  }
   function enterArena() {
     state.ready = false;
     state.lobbyDeadline = 0;
@@ -358,7 +440,7 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
     ensureGame().newMatch({
       nick: state.nick, seats: state.players, credits: state.credits,
       botNames: AI_NAMES, seatColors: SEAT_COLORS, soundOn: state.soundOn,
-      onFinish: (r) => { state.result = r; setTimeout(() => navigate("result"), 900); },
+      onFinish: (r) => { state.result = r; setTimeout(() => { leaveArena(); navigate("result"); }, 900); },
       toast: (m) => toast(m, true),
     });
     netPill();
@@ -879,12 +961,18 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
     netPill();
   }
   function pauseGame() {
-    if (state.screen !== "arena" || state.game?.room?.over) return;
+    if (state.screen !== "arena" || boot3d?.room?.over) return;
     state.paused = true;
     $("oPause").classList.remove("hidden");
   }
   function resumeGame() { $("oPause").classList.add("hidden"); state.paused = false; }
-  on("btnSound", "click", () => { state.soundOn = !state.soundOn; $("btnSound").textContent = state.soundOn ? "🔊" : "🔇"; ensureGame().setSound(state.soundOn); });
+  on("btnSound", "click", () => {
+    state.soundOn = !state.soundOn;
+    $("btnSound").textContent = state.soundOn ? "🔊" : "🔇";
+    if (menuSfx) menuSfx.on = state.soundOn;
+    menuMusic(MENU_SCREENS.includes(state.screen));
+    ensureGame().setSound(state.soundOn);
+  });
 
   // gameTick — HUD refresh every ~100 ms between renders (numbers only; 3D keeps its own 60 fps loop)
   function gameTick() {

@@ -2,8 +2,6 @@
 // generated assets in assets/music (README.txt: bomb_sfx, handoff_sfx, victory_fanfare,
 // arcade_chase, panic_stinger). No frameworks: <audio>-equivalent via HTMLAudioElement
 // would fight polish; WebAudio decode is tiny and keeps gain under our control.
-const BASE = "../assets/music/"; // relative to src/game/
-
 export function SFX(initial) {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   const master = ctx.createGain();
@@ -36,8 +34,11 @@ export function SFX(initial) {
   }
   return {
     get on() { return on; },
-    set on(v) { on = v; master.gain.value = v ? 0.5 : 0; if (!v) stopAlarm(), stopMusic(); },
+    set on(v) { on = v; master.gain.value = v ? 0.5 : 0; if (!v) { stopAlarm(); stopMusic(); } },
     play(name, opts) { play(name, opts); },
+    // browsers start the AudioContext suspended until a user gesture
+    resume() { if (ctx.state === "suspended") ctx.resume().catch(() => {}); },
+    stopMusic,
     music(name) { // one music bed at a time
       if (music.name === name) return;
       stopMusic();
@@ -58,7 +59,8 @@ export function SFX(initial) {
       osc.stop(ctx.currentTime + 0.09);
       osc.onended = () => (alarm.osc = null);
     },
-    stopAlarm: () => {},
+    stopAlarm,
   };
+  function stopAlarm() { if (alarm.osc) { try { alarm.osc.osc.stop(); } catch {} alarm.osc = null; } }
   function stopMusic() { if (music.node) { try { music.node.src.stop(); } catch {} music.node = null; music.name = null; } }
 }

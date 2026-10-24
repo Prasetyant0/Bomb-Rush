@@ -2,12 +2,18 @@
   "name": "bomb-rush",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present && node apps/web/src/game/sim.test.js",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "dev:web": "npx serve apps/web",
     "dev:server": "npm run dev --workspace @bomb-rush/server"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1"
   }
 }
