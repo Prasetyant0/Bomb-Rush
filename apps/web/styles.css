@@ -207,6 +207,7 @@ kbd { padding: 4px 6px; background: #211b2ddd; border: 1px solid #564764; font: 
 /* overlays */
 .overlay { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; z-index: 20; text-align: center; }
 .overlay b { font: 900 clamp(44px, 6vw, 72px)/1 var(--fd); }
+.overlay b span { color: var(--ws); }
 .overlay small { font-size: 10px; font-weight: 800; letter-spacing: 2px; color: #bcb0d3; }
 .overlay.spec { background: #0a051388; }
 .overlay.pause, .overlay.rotate { background: #120f20f0; padding: 30px; }
