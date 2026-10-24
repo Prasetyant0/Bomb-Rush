@@ -1,0 +1,21 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+solc_version = "0.8.28"
+optimizer = true
+optimizer_runs = 200
+evm_version = "paris"
+# Monad charges gas_limit, not gas_used (see monskills `gas/`), so the deploy
+# script pads its limit rather than relying on a tight estimate.
+
+[rpc_endpoints]
+monad_testnet = "https://testnet-rpc.monad.xyz"
+monad_mainnet = "https://rpc.monad.xyz"
+
+[fmt]
+line_length = 100
+tab_width = 4
+bracket_spacing = false

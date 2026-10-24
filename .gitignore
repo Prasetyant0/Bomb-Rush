@@ -1,9 +1,10 @@
-node_modules/
-dist/
-build/
-coverage/
-.env
-.env.*
-!.env.example
-*.log
-.DS_Store
+# Foundry build output — regenerate with `forge build`.
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+
+# Forge dependencies — reinstall with `forge install foundry-rs/forge-std --no-git`.
+contracts/lib/
+
+# Never commit a signer key.
+contracts/.env
