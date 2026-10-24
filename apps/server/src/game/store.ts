@@ -291,6 +291,10 @@ export class RoomStore {
       // Receipt verified but the follow-up read failed: leave the previous
       // status rather than guessing. The deposit itself is proven.
     }
+    // The receipt proves this seat paid. Mark it funded so the lobby and the
+    // frontend can distinguish "wallet bound" from "deposit confirmed" — those
+    // are different facts and conflating them hid the join button earlier.
+    seat.funded = true;
     this.confirmedDeposits.set(txKey, roomId);
     this.deps.onChainStatus?.(roomId, { state: room.escrowStatus, txHash: input.txHash });
     return { errors: [], escrowStatus: room.escrowStatus };

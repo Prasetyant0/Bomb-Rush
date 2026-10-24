@@ -184,7 +184,19 @@ require_chain_env() {
 
 addr_of_pk() { c wallet address --private-key "$1"; }
 
-block_ts() { c block latest --field timestamp --rpc-url "$RPC_URL"; }
+# Timestamp the NEXT mined block will carry.
+#
+# anvil stamps each new block with max(parent.timestamp + 1, wall clock). Reading
+# only `block latest` is wrong after the chain sits idle: the last block may be
+# minutes old, so a deadline computed as latest + 30 lands at a timestamp the very
+# next block has already passed and createRoom reverts BadDeadlines(). That is
+# exactly what happened on a harness run that began after an idle gap.
+block_ts() {
+  local latest now
+  latest="$(c block latest --field timestamp --rpc-url "$RPC_URL")"
+  now="$(date +%s)"
+  if bn gt "$now" "$latest"; then printf '%s' "$now"; else printf '%s' "$(bn add "$latest" 1)"; fi
+}
 
 mine() { c rpc anvil_mine "${1:-1}" --rpc-url "$RPC_URL" >/dev/null; }
 
@@ -225,7 +237,10 @@ refund_withdrawn() {
 }
 
 depositors_of() {
-  c call --json --rpc-url "$RPC_URL" "$ESCROW_ADDRESS" "getRoomDepositors(bytes32)(address[])" "$1" | jq -r '.[0][]'
+  # tr -d '\r' only: on Windows jq emits CRLF, and a swallowed trailing \r
+  # becomes part of the address when callers split on newlines.
+  c call --json --rpc-url "$RPC_URL" "$ESCROW_ADDRESS" "getRoomDepositors(bytes32)(address[])" "$1" \
+    | jq -r '.[0][]' | tr -d '\r'
 }
 
 # Gas actually paid by a mined transaction, read from its receipt.

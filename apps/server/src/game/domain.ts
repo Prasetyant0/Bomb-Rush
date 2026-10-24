@@ -26,6 +26,12 @@ export interface GameParticipant {
    * win a pot. Null means "guest / unfunded", which is valid only in demo rooms.
    */
   walletAddress: string | null;
+  /**
+   * Set true only by the deposit-confirm path, after a receipt for this exact
+   * seat/wallet/room/amount has been verified on chain. Never set from a
+   * client claim, and never inferred from `walletAddress`.
+   */
+  funded: boolean;
   ready: boolean;
   alive: boolean;
   stamina: number;
@@ -180,6 +186,7 @@ export function joinRoom(
     participantId: uuid(),
     kind,
     walletAddress,
+    funded: false, // becomes true only after a verified deposit receipt
     ready: false,
     alive: true,
     stamina: GAME_RULES.STAMINA_MAX,
@@ -664,7 +671,7 @@ export function roomPublicState(room: RoomSession): {
   allowDemoBot: boolean; startAtMs: number | null;
   roomKey: string | null;
   escrowStatus: RoomSession['escrowStatus'];
-  participants: Array<{ participantId: string; ready: boolean; kind: ParticipantKind; walletAddress: string | null }>;
+  participants: Array<{ participantId: string; ready: boolean; kind: ParticipantKind; walletAddress: string | null; funded: boolean }>;
 } {
   return {
     roomId: room.roomId,
@@ -682,6 +689,10 @@ export function roomPublicState(room: RoomSession): {
       ready: p.ready,
       kind: p.kind,
       walletAddress: p.walletAddress,
+      // True only after a deposit receipt for this seat has been verified.
+      // A bound wallet is not a deposit, and the frontend must not conflate
+      // them — that inversion hid the join button from every guest.
+      funded: p.funded === true,
     })),
   };
 }

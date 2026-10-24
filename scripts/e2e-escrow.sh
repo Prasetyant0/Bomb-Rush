@@ -95,6 +95,18 @@ end_step() {
 # A failed send marks the step instead of aborting the script.
 run_tx() {
   local label="$1" pk="$2" want="$3" to="$4"; shift 4
+  # Contract: the third argument is the expectation, the fourth is the recipient.
+  # Passing `ok`/`revert` in the recipient slot made cast read `ok` as the TO
+  # address ("invalid value 'ok' for '[TO]'"), so every call site is validated
+  # here rather than silently sending to the wrong place.
+  case "$want" in
+    ok|revert) : ;;
+    *)
+      bad "run_tx '$label' — third argument must be ok|revert, got '$want'"
+      CURRENT_STEP_FAILED=1
+      return 1
+      ;;
+  esac
   if [ "$want" = "revert" ]; then
     if revert_tx "$label" "$pk" "$to" "$@"; then return 0; fi
   else
@@ -127,7 +139,7 @@ snapshot() { # <outfile>
     printf '  "escrow": "%s",\n' "$ESCROW_ADDRESS"
     printf '  "contract": "%s",\n' "$(balance_of "$ESCROW_ADDRESS")"
     printf '  "wallets": {\n'
-    for name in host player2 player3 third_party settler admin; do
+    for name in host player2 player3 third_party settler admin rejecting_helper; do
       case "$name" in
         host)        var=HOST_ADDRESS ;;
         player2)     var=PLAYER2_ADDRESS ;;
@@ -135,7 +147,11 @@ snapshot() { # <outfile>
         third_party) var=THIRD_PARTY_ADDRESS ;;
         settler)     var=SETTLER_ADDRESS ;;
         admin)       var=ADMIN_ADDRESS ;;
+        rejecting_helper) var=REJECTING_HELPER_ADDRESS ;;
       esac
+      # The ST08 helper is a contract that ends up holding the prize it wins, so
+      # it is part of the closed money system and must be in both snapshots.
+      [ "$name" = "rejecting_helper" ] && [ -z "${REJECTING_HELPER_ADDRESS:-}" ] && continue
       [ "$first" -eq 1 ] || printf ',\n'
       first=0
       printf '    "%s": {"address": "%s", "balance": "%s"}' \
@@ -163,6 +179,42 @@ RESULT_HASH="$(c keccak "BOMB_RUSH_V05/$RUN_ID/result")"
 POT3="$(bn mul "$ENTRY_WEI" 3)"
 ZERO32="0x0000000000000000000000000000000000000000000000000000000000000000"
 ZERO_ADDR="0x0000000000000000000000000000000000000000"
+
+
+# ---------------------------------------------------------------------------
+# ST08 fixture freshness
+# dev-chain.sh deploys RejectingDepositor ONCE and records it in the env file.
+# ST08 disarms it on purpose (that is the "winner fixes its receiver" half), and
+# disarm() is permanent. On an idempotent chain reuse the recorded helper is
+# therefore already armed=false and payout would succeed, failing ST08 for the
+# wrong reason. So: reuse the recorded helper only while it still rejects;
+# otherwise deploy a fresh one and record it in the run directory, never in
+# contracts/broadcast (which mixes local and testnet runs on chainId 10143).
+ensure_rejecting_helper() {
+  if [ -n "${REJECTING_HELPER_ADDRESS:-}" ] \
+     && [ "$(c code "$REJECTING_HELPER_ADDRESS" --rpc-url "$RPC_URL" 2>/dev/null)" != "0x" ] \
+     && [ "$(c call --rpc-url "$RPC_URL" "$REJECTING_HELPER_ADDRESS" 'rejecting()(bool)' 2>/dev/null | tr -d '[:space:]')" = "true" ]; then
+    info "reusing armed RejectingDepositor at $REJECTING_HELPER_ADDRESS"
+    return 0
+  fi
+  info "recorded RejectingDepositor is missing or already disarmed; deploying a fresh one"
+  local js addr
+  js="$( cd "$CONTRACTS_DIR" && forge create "$SETTLEMENT_HELPER" \
+           --rpc-url "$RPC_URL" --private-key "$ADMIN_KEY" --broadcast --json \
+           --constructor-args "$ESCROW_ADDRESS" 2>/dev/null )" || return 1
+  addr="$(printf '%s' "$js" | jq -r '.deployedTo')"
+  [ -n "$addr" ] && [ "$addr" != "null" ] || return 1
+  [ "$(c code "$addr" --rpc-url "$RPC_URL")" != "0x" ] || return 1
+  [ "$(c call --rpc-url "$RPC_URL" "$addr" 'rejecting()(bool)' | tr -d '[:space:]')" = "true" ] || return 1
+  REJECTING_HELPER_ADDRESS="$addr"
+  printf 'REJECTING_HELPER_ADDRESS=%s\n' "$addr" > "$RUN_DIR/rejecting-helper.env"
+  ok "fresh RejectingDepositor at $addr (recorded in $RUN_DIR/rejecting-helper.env)"
+}
+
+ensure_rejecting_helper || {
+  bad "could not obtain an armed RejectingDepositor; ST08 cannot be proven"
+  exit 1
+}
 
 snapshot "$SNAP_BEFORE"
 
@@ -668,13 +720,13 @@ info "settle (late):     status=$S_SETTLE_LATE"
 jq -cn --arg hash "$TX_EXPIRE" --arg to "$ESCROW_ADDRESS" \
   --arg gasUsed "$(c receipt "$TX_EXPIRE" gasUsed --rpc-url "$RPC_URL")" \
   --arg price "$(c receipt "$TX_EXPIRE" effectiveGasPrice --rpc-url "$RPC_URL")" \
-  --arg status "$S_EXPIRE" \
-  '{label:"race-expire",hash:$hash,from:"-",to:$to,gasUsed:$gasUsed,price:$price,status:$status}' >>"$TX_LOG"
+  --arg status "$S_EXPIRE" --arg from "$THIRD_PARTY_ADDRESS" \
+  '{label:"race-expire",hash:$hash,from:$from,to:$to,gasUsed:$gasUsed,price:$price,status:$status}' >>"$TX_LOG"
 jq -cn --arg hash "$TX_SETTLE_LATE" --arg to "$ESCROW_ADDRESS" \
   --arg gasUsed "$(c receipt "$TX_SETTLE_LATE" gasUsed --rpc-url "$RPC_URL")" \
   --arg price "$(c receipt "$TX_SETTLE_LATE" effectiveGasPrice --rpc-url "$RPC_URL")" \
-  --arg status "$S_SETTLE_LATE" \
-  '{label:"race-settle-late",hash:$hash,from:"-",to:$to,gasUsed:$gasUsed,price:$price,status:$status}' >>"$TX_LOG"
+  --arg status "$S_SETTLE_LATE" --arg from "$SETTLER_ADDRESS" \
+  '{label:"race-settle-late",hash:$hash,from:$from,to:$to,gasUsed:$gasUsed,price:$price,status:$status}' >>"$TX_LOG"
 
 must assert_eq "expireUnresolved won at the deadline boundary" "$S_EXPIRE" "true"
 must assert_eq "the competing settle after the deadline reverted" "$S_SETTLE_LATE" "false"

@@ -182,8 +182,18 @@ eq(escrowAddressFromEnv({ ESCROW_ADDRESS: "0xNOTHEX" }), null, "malformed overri
 eq(escrowAddressFromEnv({ ESCROW_ADDRESS: "0x" + "12".repeat(20) }), "0x" + "12".repeat(20), "valid override honoured");
 
 console.log("\nescrow chain guard");
-function fakeWallet({ chainId = "0x279f", calls = {}, onSend } = {}) {
+// A chain fake that behaves like a provider after a real send: every hash it
+// issued gets a mined receipt (blockNumber set, status 0x1) on the next poll.
+// createRoom/joinRoom now wait for that receipt, so a provider that returns
+// null forever is no longer a valid stand-in for "the tx went through".
+// `receiptStatus` flips the mined receipt to a revert ("0x0"); `mine: false`
+// models a tx that never gets included. `receiptCalls` records every
+// eth_getTransactionReceipt poll so tests can prove the wait happened.
+function fakeWallet({ chainId = "0x279f", calls = {}, onSend, receiptStatus = "0x1", mine = true } = {}) {
+  const issued = new Set();
+  const receiptCalls = [];
   return {
+    receiptCalls,
     request: async (method, params) => {
       if (method === "eth_chainId") return typeof chainId === "function" ? chainId() : chainId;
       if (method === "eth_call") {
@@ -192,8 +202,15 @@ function fakeWallet({ chainId = "0x279f", calls = {}, onSend } = {}) {
         return "0x" + "0".repeat(64);
       }
       if (method === "eth_sendTransaction") {
-        if (onSend) return onSend(params[0]);
-        return "0x" + "aa".repeat(32);
+        const hash = onSend ? onSend(params[0]) : "0x" + "aa".repeat(32);
+        if (typeof hash === "string" && /^0x[0-9a-fA-F]{64}$/.test(hash)) issued.add(hash.toLowerCase());
+        return hash;
+      }
+      if (method === "eth_getTransactionReceipt") {
+        const hash = String(params?.[0] ?? "");
+        receiptCalls.push(hash);
+        if (!mine || !issued.has(hash.toLowerCase())) return null; // not mined (yet)
+        return { blockNumber: "0x1", status: receiptStatus, transactionHash: hash };
       }
       if (method === "eth_accounts") return [ACCOUNT];
       throw new Error("unexpected " + method);
@@ -289,6 +306,64 @@ const joinEscrow = createEscrow({
 await joinEscrow.joinRoom(ROOM_KEY);
 eq(joinTx.value, "0x" + (10n ** 15n).toString(16), "joinRoom value read from getRoom().entryWei");
 eq(joinTx.data, encodeJoinRoom(ROOM_KEY), "joinRoom calldata");
+
+// ---- receipt gate: a tx hash alone is not a confirmed deposit ----
+console.log("\nreceipt gate");
+{
+  const createWalletFake = fakeWallet({
+    calls: boundsCall,
+    onSend: () => "0x" + "ab".repeat(32),
+  });
+  const escrow = createEscrow({ wallet: createWalletFake, escrowAddress: ESCROW });
+  const res = await escrow.createRoom({
+    roomKey: ROOM_KEY, seats: 4, entryWei: 5n * 10n ** 15n,
+    fundingDeadline: 1900000000n, resolutionDeadline: 1900000600n,
+  });
+  eq(res.txHash, "0x" + "ab".repeat(32), "createRoom still returns the tx hash");
+  assert(createWalletFake.receiptCalls.length >= 1, "createRoom polled eth_getTransactionReceipt at least once");
+  eq(createWalletFake.receiptCalls[0], "0x" + "ab".repeat(32), "receipt polled for the hash the provider issued");
+}
+
+// A reverted tx still mines and still has a hash: treating it as confirmed
+// would report a failed deposit as funded.
+{
+  const reverted = fakeWallet({
+    calls: boundsCall,
+    onSend: () => "0x" + "ef".repeat(32),
+    receiptStatus: "0x0",
+  });
+  const escrow = createEscrow({ wallet: reverted, escrowAddress: ESCROW });
+  await rejects(
+    () => escrow.createRoom({ roomKey: ROOM_KEY, seats: 4, entryWei: 5n * 10n ** 15n, fundingDeadline: 1900000000n, resolutionDeadline: 1900000600n }),
+    "TX_REVERTED", "createRoom rejects a mined receipt with status 0x0",
+  );
+  assert(reverted.receiptCalls.length >= 1, "revert was detected from the receipt, not guessed");
+}
+
+// joinRoom has the same hazard as createRoom.
+{
+  const joinFake = fakeWallet({
+    calls: { ...boundsCall, [SELECTORS.getRoom]: roomForJoin },
+    onSend: () => "0x" + "cd".repeat(32),
+  });
+  const escrow = createEscrow({ wallet: joinFake, escrowAddress: ESCROW });
+  await escrow.joinRoom(ROOM_KEY);
+  assert(joinFake.receiptCalls.length >= 1, "joinRoom polled eth_getTransactionReceipt at least once");
+  eq(joinFake.receiptCalls[0], "0x" + "cd".repeat(32), "joinRoom polled the receipt for its own tx");
+}
+
+// A provider that never includes the tx must surface TX_TIMEOUT, not hang.
+// Short timeout via the waitForReceipt option so the suite stays fast.
+{
+  const neverMines = createEscrow({
+    wallet: fakeWallet({ calls: boundsCall, onSend: () => "0x" + "77".repeat(32), mine: false }),
+    escrowAddress: ESCROW,
+  });
+  await rejects(
+    () => neverMines._waitForReceipt("0x" + "77".repeat(32), { timeoutMs: 50, intervalMs: 10 }),
+    "TX_TIMEOUT", "a never-mined tx times out",
+  );
+}
 
 // a bad provider return is not accepted as a tx hash
 const lyingProvider = createEscrow({

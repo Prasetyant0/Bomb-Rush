@@ -32,6 +32,22 @@ need_cmd cast jq node
 require_chain
 require_chain_env
 
+# The env file (written by dev-chain.sh) names the three player wallets P1/P2/P3;
+# this script speaks of them by role. Without this mapping every $HOST_ADDRESS
+# below is unbound and `set -u` kills the run.
+if [ -z "${P1_KEY:-}" ]; then
+  P1_KEY="${HOST_KEY:-$HOST_PK}";            P1_ADDRESS="$HOST_ADDRESS"
+  P2_KEY="${PLAYER2_KEY:-$PLAYER2_PK}";      P2_ADDRESS="$PLAYER2_ADDRESS"
+  P3_KEY="${PLAYER3_KEY:-$PLAYER3_PK}";      P3_ADDRESS="$PLAYER3_ADDRESS"
+fi
+HOST_ADDRESS="${P1_ADDRESS:-}";   HOST_PK="${P1_KEY:-}"
+PLAYER2_ADDRESS="${P2_ADDRESS:-}"; PLAYER2_PK="${P2_KEY:-}"
+PLAYER3_ADDRESS="${P3_ADDRESS:-}"; PLAYER3_PK="${P3_KEY:-}"
+for v in HOST_ADDRESS PLAYER2_ADDRESS PLAYER3_ADDRESS THIRD_PARTY_ADDRESS \
+         SETTLER_ADDRESS ADMIN_ADDRESS; do
+  [ -n "${!v:-}" ] || die "$CHAIN_ENV does not provide $v. Re-run scripts/dev-chain.sh."
+done
+
 RUN_DIR="$SCRIPTS_DIR/.local-chain/$PORT_TAG"
 TX_LOG="$RUN_DIR/txlog.jsonl"
 ROOMS_FILE="$RUN_DIR/rooms.json"
@@ -89,7 +105,9 @@ end
 
 begin "C2 — every room is terminal and its pot is fully accounted for"
 
-mapfile -t KEYS < <(jq -r 'to_entries[] | "\(.key) \(.value)"' "$ROOMS_FILE")
+# tr -d '\r': on Windows, jq emits CRLF, and a trailing \r on the room key makes
+# cast reject the argument ("parser error" pointing just past the key).
+mapfile -t KEYS < <(jq -r 'to_entries[] | "\(.key) \(.value)"' "$ROOMS_FILE" | tr -d '\r')
 for entry in "${KEYS[@]}"; do
   name="${entry%% *}"; key="${entry#* }"
   room="$(room_json "$key")"
@@ -183,7 +201,9 @@ console.log(JSON.stringify(res));
 
 wallet_gas() { printf '%s' "$GAS_JSON" | jq -r --arg a "$(lower "$1")" '.[$a] // "0"'; }
 
-# Wallet roles are known; map them to the addresses in the env.
+# Wallet roles are known; map them to the addresses in the env. The ST08
+# RejectingDepositor is a contract, but it wins and holds a pot, so it belongs in
+# the closed money system just like a wallet.
 declare -A ROLES=(
   [host]="$HOST_ADDRESS"
   [player2]="$PLAYER2_ADDRESS"
@@ -192,6 +212,11 @@ declare -A ROLES=(
   [settler]="$SETTLER_ADDRESS"
   [admin]="$ADMIN_ADDRESS"
 )
+# The ST08 helper address must come from the snapshot, not the env file: the E2E
+# deploys a fresh RejectingDepositor when the recorded one is already disarmed,
+# and the money it holds belongs to whichever one the run actually used.
+HELPER_IN_SNAP="$(jq -r '.wallets.rejecting_helper.address // empty' "$SNAP_BEFORE")"
+[ -n "$HELPER_IN_SNAP" ] && ROLES[rejecting_helper]="$HELPER_IN_SNAP"
 
 # Expectation per wallet, derived from room state:
 #   a depositor is owed  +entry for each CANCELED room it withdrew from, or
@@ -206,7 +231,9 @@ declare -A ROLES=(
 begin "C4 — sum of all wallet deltas plus gas paid is exactly zero (no money escaped)"
 
 sum_delta=0
-for role in host player2 player3 third_party settler admin; do
+for role in host player2 player3 third_party settler admin ${HELPER_IN_SNAP:+rejecting_helper}; do
+  # Skip a role the snapshot never recorded (e.g. a helper deployed after it).
+  jq -e --arg r "$role" '.wallets[$r]' "$SNAP_BEFORE" >/dev/null 2>&1 || continue
   addr="${ROLES[$role]}"
   before="$(jq -r --arg r "$role" '.wallets[$r].balance' "$SNAP_BEFORE")"
   after="$(balance_of "$addr")"

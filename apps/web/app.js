@@ -64,6 +64,13 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
     if (next === "lobby") { renderLobby(); if (state.funded) refreshDepositors(); }
     if (next === "result") renderResult();
     if (next === "create") loadBounds();
+    // A guest arriving on ?net=1&room=<roomId> has no seat yet. Bind it on the
+    // way into the lobby, otherwise the join row never appears: prepareNetRoom
+    // used to be reachable only from startNetworkedArena, so a guest had to
+    // detour through the arena before they could join.
+    if (next === "lobby" && !state.netRoom && state.netMode) {
+      prepareNetRoom().then((ok) => { if (ok) { renderLobby(); if (state.funded) refreshDepositors(); } });
+    }
   }
 
   // ==== toast (both lobby and in-arena) ====
@@ -278,7 +285,9 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
     const participants = state.netState?.participants;
     if (!Array.isArray(participants)) return true; // joined, roster not received yet
     const me = participants.find((p) => p.participantId === state.netRoom?.participantId);
-    return !me || !me.walletAddress;
+    // `funded` is set by the server only after it verified the deposit receipt.
+    // A bound wallet is not a deposit.
+    return !me || !me.funded;
   }
   /** Read this funded room's on-chain entryWei once, for the guest join button. */
   let entryReadAt = 0;
@@ -715,8 +724,13 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
       //    built here, not derived by the server afterwards.
       const { roomKey } = esc.makeRoomKey(addr);
 
-      // 2. Deadlines in UNIX SECONDS (contract uint64), computed browser-side:
-      //    now + 600 / now + 1200, clamped to the contract's own windows.
+      // 2. Deadlines in UNIX SECONDS (contract uint64), computed browser-side.
+      //    The contract caps each window at creation time, so the value sent is
+      //    min(intended window, cap - 60s). With the deployed caps that is
+      //    540 / 1140, NOT the 600 / 1200 named in the spec — the spec's numbers
+      //    are the caps, and the 60s slack exists because block.timestamp runs
+      //    ahead of the browser clock and the contract rejects a deadline past
+      //    `nowTs + cap`.
       const windows = await esc.readWindows();
       const nowSec = BigInt(Math.floor(Date.now() / 1000));
       // Leave a minute of slack under each contract cap: block.timestamp is
@@ -830,9 +844,15 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
         state.code = res.room?.code || state.code;
         // A funded room the guest has not deposited into yet: carry the server's
         // roomKey so the lobby can offer joinRoom() with the contract's amount.
+        //
+        // The seat carries a wallet because joinRoom bound it a moment ago. The
+        // question is not "does the seat have a wallet" but "has this seat's
+        // deposit been confirmed on chain". Reading it the other way inverted
+        // the gate and hid the join button from every connected guest.
         const roomKey = res.room?.roomKey ?? null;
         const me = (res.room?.participants || []).find((p) => p.participantId === res.participantId);
-        if (state.escrowAddress && roomKey && me && !me.walletAddress) {
+        const alreadyFunded = Boolean(me?.funded);
+        if (state.escrowAddress && roomKey && me && !alreadyFunded) {
           state.funded = { txHash: null, entryWei: null, roomKey, depositConfirmed: false };
           state.netMode = true;
         }
@@ -896,12 +916,17 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
     $("rName").textContent = win;
     $("rDesc").textContent = isMe ? "KAMU BERTAHAN DARI KEKACAUAN" : "JUARA MATCH LOKAL INI";
     $("rMode").textContent = `${r.seatCount}-PLAYER SURVIVAL`;
-    $("rPool").textContent = String(r.credits * r.seatCount);
 
     // `funded` means escrow-backed, not necessarily deposit-verified for THIS
     // wallet. The pool line only claims MON when the receipt was confirmed.
     const funded = !!state.funded;
     const verified = !!state.funded?.depositConfirmed;
+    // Print a MON figure ONLY when it is actually MON. The demo-credit path used
+    // to write an integer here while the unit line underneath said "MON", so a
+    // 100-credit room read as a 300 MON pot.
+    $("rPool").textContent = verified
+      ? fmtMon(state.funded.entryWei * BigInt(r.seatCount))
+      : String(r.credits * r.seatCount);
     $("rPoolUnit").textContent = verified
       ? `${fmtMon(state.funded.entryWei * BigInt(r.seatCount))} MON TESTNET · NO REAL VALUE`
       : funded ? "ROOM BERDANA · DEPOSIT BELUM TERVERIFIKASI"
@@ -964,13 +989,18 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
     if (failed && rec?.reason) links.push(`<span>Penyebab: ${escapeHTML(String(rec.reason)).slice(0, 200)}</span>`);
     $("rTxLinks").innerHTML = links.join("");
 
-    // The headline word is exactly what the server sent.
+    // The headline word is the settlement state AFTER the downgrade, not the raw
+    // server string. A `CONFIRMED` badge with no settle tx hash means the server
+    // asserted a settlement it never proved, and printing "TERVERIFIKASI"
+    // underneath would be a claim the evidence does not support.
     $("rChain").textContent = failed ? "FAILED" : confirmed ? "CONFIRMED" : settling ? "SETTLING" : "PENDING";
     $("rChainSub").textContent = failed
       ? "NOT YET RECORDED ON-CHAIN — DANA TETAP DI ESCROW"
-      : confirmed
+      : (confirmed && proj.settleTxHash)
         ? (proj.payoutTxHash ? "SETTLEMENT + PAYOUT TERVERIFIKASI" : "SETTLEMENT TERVERIFIKASI · BELUM DIBAYAR")
-        : "MENUNGGU SETTLEMENT";
+        : confirmed
+          ? "STATUS DITERIMA TANPA RECEIPT — BELUM TERVERIFIKASI"
+          : "MENUNGGU SETTLEMENT";
     $("rChainNote").textContent = proj.mismatch
       ? "Server mengirim status tanpa receipt pendukung; UI menurunkannya ke status yang benar-benar terbukti."
       : "Status hanya berubah dari event chain:status server. Hasil game tidak pernah dianggap sebagai pembayaran.";
@@ -1091,9 +1121,21 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
       else toast(key);
     },
     "copy-code": () => {
-      const val = state.code;
-      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(val).then(() => toast("Kode disalin: " + val), () => toast("Kode: " + val));
-      else toast("Kode: " + val);
+      // A funded networked room is joined by roomId, not by the 6-char code:
+      // the server has no route keyed on the code. Handing a guest the code
+      // gave them a string the app could not resolve, so share the link that
+      // actually binds a seat.
+      const roomId = state.netRoom?.roomId;
+      const isLink = state.netMode && roomId;
+      const val = isLink
+        ? `${location.origin}${location.pathname}?net=1&room=${encodeURIComponent(roomId)}`
+        : state.code;
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(val).then(
+          () => toast(isLink ? "Link undangan disalin" : "Kode disalin: " + val),
+          () => toast(isLink ? val : "Kode: " + val),
+        );
+      } else toast(isLink ? val : "Kode: " + val);
     },
     lobby: () => { leaveArena(); navigate("lobby"); state.paused = false; },
     pause: () => pauseGame(),

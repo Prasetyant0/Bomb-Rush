@@ -110,6 +110,44 @@ export function createEscrow({ wallet, escrowAddress, chainId = MONAD_CHAIN_ID }
     return decodeEntryBounds(await ethCall(SELECTORS.entryBounds));
   }
 
+  /**
+   * Wait until a transaction is mined and report whether it succeeded.
+   *
+   * Nothing downstream may treat a tx hash as proof of anything: the server
+   * verifies deposits by reading the chain, and an unmined key reads back as
+   * `status: NONE`, which the server correctly rejects. Returning the hash
+   * without this wait made every create/join fail with HTTP 400 while the
+   * transaction was still pending.
+   *
+   * Polls because Monad mines fast and `eth_getTransactionReceipt` returns null
+   * until it does. Bounded so a stuck tx surfaces as an error, not a hang.
+   */
+  async function waitForReceipt(txHash, { timeoutMs = 90_000, intervalMs = 750 } = {}) {
+    const started = Date.now();
+    for (;;) {
+      const receipt = await request("eth_getTransactionReceipt", [txHash]).catch(() => null);
+      if (receipt && receipt.blockNumber) {
+        // status is "0x1" on success; a reverted tx still mines and still has a
+        // hash, so a caller that ignored this would report a failed deposit as
+        // confirmed.
+        if (receipt.status !== "0x1") {
+          throw Object.assign(new Error("TX_REVERTED: " + txHash), {
+            code: "TX_REVERTED",
+            txHash,
+          });
+        }
+        return receipt;
+      }
+      if (Date.now() - started > timeoutMs) {
+        throw Object.assign(new Error("TX_TIMEOUT: " + txHash), {
+          code: "TX_TIMEOUT",
+          txHash,
+        });
+      }
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+  }
+
   async function createRoom({ roomKey, seats, entryWei, fundingDeadline, resolutionDeadline }) {
     await assertChain();
     const amount = BigInt(entryWei);
@@ -123,6 +161,9 @@ export function createEscrow({ wallet, escrowAddress, chainId = MONAD_CHAIN_ID }
       data,
     }]);
     if (!isTxHash(txHash)) throw new Error("BAD_TX_HASH: provider returned " + String(txHash));
+    // Do not return until the room exists on chain, or the server's read of the
+    // supplied roomKey will find status NONE and reject the room.
+    await waitForReceipt(txHash);
     return { txHash, roomKey, entryWei: amount };
   }
 
@@ -145,6 +186,9 @@ export function createEscrow({ wallet, escrowAddress, chainId = MONAD_CHAIN_ID }
       data: encodeJoinRoom(roomKey),
     }]);
     if (!isTxHash(txHash)) throw new Error("BAD_TX_HASH: provider returned " + String(txHash));
+    // Same reason as createRoom: the server reads the chain to confirm the
+    // deposit, so a pending tx reads as "not deposited".
+    await waitForReceipt(txHash);
     return { txHash, roomKey, entryWei: amount };
   }
 
@@ -226,6 +270,13 @@ export function createEscrow({ wallet, escrowAddress, chainId = MONAD_CHAIN_ID }
 
     /** joinRoom(bytes32), msg.value == entryWei (read from the room, not assumed). */
     joinRoom,
+
+    /**
+     * @internal Test hook only: the exact receipt gate createRoom/joinRoom use.
+     * Exposed so a never-mining provider can be proven to time out on a short
+     * clock instead of the production 90 s. Not part of the app surface.
+     */
+    _waitForReceipt: waitForReceipt,
   };
 }
 

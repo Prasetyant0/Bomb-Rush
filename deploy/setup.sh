@@ -67,9 +67,16 @@ id -u "$SERVICE_USER" >/dev/null 2>&1 || useradd -r -s /usr/sbin/nologin "$SERVI
 
 # ---------------------------------------------------------------- 3. repo
 say "repository at $APP_DIR"
+# The checkout belongs to SERVICE_USER but this script runs as root, so git
+# refuses with "dubious ownership". Marking the one directory safe is narrower
+# than relaxing ownership checks globally.
+git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$APP_DIR" \
+  || git config --global --add safe.directory "$APP_DIR"
+
 if [ -d "$APP_DIR/.git" ]; then
-  git -C "$APP_DIR" fetch --all --quiet
-  git -C "$APP_DIR" reset --hard origin/dev
+  # Fetch and reset as the owner so the working tree stays owned by SERVICE_USER.
+  sudo -u "$SERVICE_USER" git -C "$APP_DIR" fetch --all --quiet
+  sudo -u "$SERVICE_USER" git -C "$APP_DIR" reset --hard origin/dev
 elif [ -d "$APP_DIR" ] && [ -z "$(ls -A "$APP_DIR" 2>/dev/null)" ]; then
   # Empty leftover directory: git clone into it is fine once we remove it.
   rmdir "$APP_DIR" 2>/dev/null || true
@@ -83,13 +90,16 @@ chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
 
 # ---------------------------------------------------------------- 4. build
 say "build"
-sudo -u "$SERVICE_USER" bash -lc "cd $APP_DIR && npm ci --omit=dev --no-audit --no-fund"
-sudo -u "$SERVICE_USER" bash -lc "cd $APP_DIR && npm run build --workspace @bomb-rush/server"
+sudo -u "$SERVICE_USER" bash -lc "cd $APP_DIR && npm ci --include=dev --no-audit --no-fund"
 
-# The shared package is imported at runtime, so it must be built too.
-if [ -f "$APP_DIR/packages/shared/tsconfig.json" ]; then
-  sudo -u "$SERVICE_USER" bash -lc "cd $APP_DIR && npm run build --workspace @bomb-rush/shared" || warn "shared build skipped"
-fi
+# ORDER MATTERS: the server imports @bomb-rush/shared, whose package.json points
+# at dist/index.js. Building the server first fails with TS2307 because that
+# file does not exist yet. Shared must be compiled before its consumers.
+sudo -u "$SERVICE_USER" bash -lc "cd $APP_DIR && npm run build --workspace @bomb-rush/shared"
+[ -f "$APP_DIR/packages/shared/dist/index.js" ] || die "shared build produced no dist/index.js"
+
+sudo -u "$SERVICE_USER" bash -lc "cd $APP_DIR && npm run build --workspace @bomb-rush/server"
+[ -f "$APP_DIR/apps/server/dist/index.js" ] || die "server build produced no dist/index.js"
 
 # ---------------------------------------------------------------- 5. env
 say "environment file"
@@ -121,6 +131,22 @@ ENVEOF
 else
   say "keeping existing $ENV_FILE"
 fi
+
+# PORT and ALLOWED_ORIGINS are owned by the deploy, not by the operator: they
+# describe where this script put the service and which hostname fronts it.
+# Leaving a stale PORT from an earlier run is how the service ended up trying
+# to bind :3000, which another application owns.
+if grep -q '^PORT=' "$ENV_FILE"; then
+  sed -i "s|^PORT=.*|PORT=${PORT}|" "$ENV_FILE"
+else
+  printf 'PORT=%s\n' "$PORT" >> "$ENV_FILE"
+fi
+if grep -q '^HOST=' "$ENV_FILE"; then
+  sed -i "s|^HOST=.*|HOST=127.0.0.1|" "$ENV_FILE"
+else
+  printf 'HOST=127.0.0.1\n' >> "$ENV_FILE"
+fi
+say "env PORT=$PORT"
 
 # Inject the settler key if the operator staged one next to this script.
 if [ -f /tmp/bomb-deploy.env ]; then
