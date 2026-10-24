@@ -19,3 +19,14 @@ monad_mainnet = "https://rpc.monad.xyz"
 line_length = 100
 tab_width = 4
 bracket_spacing = false
+
+# Stateful invariant campaign. Required by QA_CROSSPLAY.md ST18 (balance
+# conservation) and AUDIT_CHECKLIST.md §2. Per-call fuzzing cannot reach the
+# orderings that break an escrow, so this runs the handler in random sequences.
+[invariant]
+runs = 256
+depth = 100
+fail_on_revert = false
+call_override = false
+shrink_run_limit = 1000
+
