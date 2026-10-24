@@ -1,10 +1,11 @@
 {
   "name": "bomb-rush",
   "private": true,
+  "type": "module",
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && node src/game/sim.test.js",
     "typecheck": "npm run typecheck --workspaces --if-present"
   }
 }

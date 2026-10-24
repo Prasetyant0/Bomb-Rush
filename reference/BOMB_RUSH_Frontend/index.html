@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#090914" />
+  <title>BOMB RUSH — Survive the Last Second</title>
+  <meta name="description" content="BOMB RUSH frontend experience prototype. One bomb, four contenders, one survivor." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app" class="app">
+    <div class="grain"></div>
+    <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+
+    <header id="siteHeader" class="site-header">
+      <button class="brand" data-action="home" aria-label="Go to home">
+        <span class="brand-symbol" aria-hidden="true"><span class="brand-bomb"></span><i></i></span>
+        <span class="brand-word">BOMB<span>RUSH</span><b class="brand-star">✳</b></span>
+      </button>
+      <nav class="header-nav">
+        <button data-action="how">HOW IT WORKS</button>
+        <button data-action="controls">CONTROLS</button>
+        <span class="nav-divider"></span>
+        <span class="testnet-pill"><span></span> MONAD TESTNET · PLANNED</span>
+      </nav>
+      <button id="headerPlay" class="mini-cta" data-action="create">PLAY NOW <span>↗</span></button>
+    </header>
+
+    <main id="screenLanding" class="screen landing-screen active">
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="eyebrow-line"></span><span>THE FASTEST WAY TO LOSE YOUR FRIENDS</span><span class="tiny-spark">✦</span></div>
+          <h1>DON'T<br/><span class="stroke-word">GET</span> <span class="orange-text">CAUGHT.</span></h1>
+          <div class="hero-mini-line"><span class="red-orb"></span> PASS IT. RUN. SURVIVE.</div>
+          <p class="hero-desc">One bomb. Four contenders. Ten seconds on the clock. Pass the chaos before time runs out. <strong>Last player standing wins.</strong></p>
+          <div class="hero-actions">
+            <button class="btn btn-primary btn-xl" data-action="create">ENTER THE ARENA <span class="btn-arrow">↗</span></button>
+            <button class="btn btn-outline btn-xl" data-action="join">JOIN WITH CODE <span>⌗</span></button>
+          </div>
+          <div class="hero-foot"><div class="avatars-mini"><i style="--a:#97e7d1">N</i><i style="--a:#ffc17d">A</i><i style="--a:#b59aff">K</i></div><div><strong>Built for the whole squad.</strong><span>No downloads. Just pure panic.</span></div></div>
+        </div>
+        <div class="hero-art">
+          <div class="art-backtext">BOOM!</div>
+          <div class="hero-orbit orbit-a"></div><div class="hero-orbit orbit-b"></div>
+          <div class="hero-art-top"><span class="preview-live"><i></i> GAME PREVIEW</span><span class="preview-count">01 <span>/</span> 03</span></div>
+          <canvas id="heroCanvas" aria-label="Stylized arena preview" role="img"></canvas>
+          <div class="art-warning"><span>⚠</span> BOMB ACTIVE <b>00:07</b></div>
+          <div class="art-float art-float-left"><span>✦</span><div><b>4 PLAYERS</b><small>ONE WINNER</small></div></div>
+          <div class="art-float art-float-right"><span>⚡</span><div><b>10 SEC</b><small>TO PASS IT</small></div></div>
+          <div class="hero-art-bottom"><span>NOT ANOTHER BORING WEB3 GAME</span><span class="scribble-arrow">↖</span></div>
+        </div>
+      </section>
+      <section class="quick-stats">
+        <div class="stat-item"><span class="stat-icon">◉</span><strong>03–04</strong><div>PLAYERS <small>PER MATCH</small></div></div>
+        <div class="stat-separator"></div>
+        <div class="stat-item"><span class="stat-icon">◷</span><strong>20–30s</strong><div>GAMEPLAY <small>NON-STOP ACTION</small></div></div>
+        <div class="stat-separator"></div>
+        <div class="stat-item"><span class="stat-icon">↗</span><strong>ZERO</strong><div>DOWNLOADS <small>PLAY IN BROWSER</small></div></div>
+        <div class="stat-separator"></div>
+        <div class="stat-item stat-last"><span class="stat-icon">✳</span><strong>100%</strong><div>CHAOS <small>GUARANTEED*</small></div></div>
+      </section>
+      <section class="how-section" id="howSection">
+        <div class="section-heading"><div class="eyebrow"><span class="eyebrow-line"></span> EASY TO LEARN. HARD TO SURVIVE.</div><h2>THREE STEPS TO <span>GLORY.</span></h2></div>
+        <div class="how-grid">
+          <article class="how-card"><div class="how-card-top"><span>01 /</span><span class="how-symbol">⌗</span></div><h3>GRAB YOUR SQUAD</h3><p>Create a room or enter a friend's six-character code. Three or four players. That's all you need.</p><div class="card-decor decor-one">⌗</div></article>
+          <article class="how-card"><div class="how-card-top"><span>02 /</span><span class="how-symbol">↗</span></div><h3>PASS THE BOMB</h3><p>You've got ten seconds. Chase another player, get close, and pass it. The timer never resets.</p><div class="card-decor decor-two">●</div></article>
+          <article class="how-card"><div class="how-card-top"><span>03 /</span><span class="how-symbol">✳</span></div><h3>BE THE LAST ONE</h3><p>Whoever holds the bomb at zero is out. Stay alive until you're the only one left.</p><div class="card-decor decor-three">★</div></article>
+        </div>
+        <div class="disclaimer-line"><span>◈</span> FRONTEND CONCEPT · ALL CREDITS ARE VIRTUAL DEMO CREDITS WITH NO MONETARY VALUE · NO REAL TRANSACTIONS</div>
+      </section>
+    </main>
+
+    <main id="screenCreate" class="screen inner-screen">
+      <div class="inner-heading"><button class="back-link" data-action="home">← BACK TO HOME</button><span class="step-tag">01 / CREATE ROOM</span></div>
+      <div class="room-layout">
+        <section class="config-panel">
+          <div class="section-label"><span class="square-dot"></span> ROOM SETUP</div><h2>SET THE <span>STAGE.</span></h2><p class="muted intro">Your room. Your rules. The chaos is on us.</p>
+          <div class="form-field"><label for="createName">YOUR NICKNAME <small>HOW OTHER PLAYERS SEE YOU</small></label><input id="createName" type="text" maxlength="16" value="RUSHER" placeholder="Choose a nickname" autocomplete="off" /></div>
+          <div class="form-field"><label>NUMBER OF PLAYERS</label><div class="choice-grid two"><button id="players3" class="option-card" data-players="3"><strong>03 <span>PLAYERS</span></strong><small>20 SECOND MATCH</small></button><button id="players4" class="option-card selected" data-players="4"><strong>04 <span>PLAYERS</span></strong><small>30 SECOND MATCH</small></button></div></div>
+          <div class="form-field"><label>ENTRY AMOUNT <small>VIRTUAL DEMO CREDITS</small></label><div class="choice-grid four" id="creditOptions"><button class="credit-chip" data-credits="10">10</button><button class="credit-chip" data-credits="50">50</button><button class="credit-chip selected" data-credits="100">100</button><button class="credit-chip" data-credits="500">500</button></div><div class="input-hint-row"><span>OR CUSTOM AMOUNT</span><input id="customCredits" type="number" min="1" max="1000" step="1" placeholder="1–1000" aria-label="Custom credit amount" /></div></div>
+          <div class="form-field"><label>ROOM VISIBILITY</label><div class="visibility-row"><button id="publicRoom" class="visibility-card selected" data-visibility="public"><span>◎</span><div><strong>PUBLIC ROOM</strong><small>Open to anyone with the code</small></div><i class="radio-indicator"></i></button><button id="privateRoom" class="visibility-card" data-visibility="private"><span>♙</span><div><strong>PRIVATE ROOM</strong><small>Invite your squad directly</small></div><i class="radio-indicator"></i></button></div></div>
+          <div class="form-error" id="createError" role="alert"></div>
+          <button class="btn btn-primary btn-block btn-big" data-action="confirm-create">CREATE ROOM <span class="btn-arrow">↗</span></button>
+          <p class="form-footnote">No wallet required for the local UI preview. All room data stays in this browser.</p>
+        </section>
+        <aside class="room-aside"><div class="aside-header"><span>YOUR MATCH PREVIEW</span><span>✳</span></div><div class="arena-mini-wrap"><canvas id="roomCanvas" role="img" aria-label="Arena illustration"></canvas></div><div class="aside-info"><div><small>YOUR PLAYERS</small><strong id="asidePlayers">4 SURVIVORS</strong></div><div><small>YOUR GAME TIME</small><strong id="asideTime">30 SECONDS</strong></div><div><small>YOUR ENTRY</small><strong id="asideCredits">100 VIRTUAL DEMO CREDITS</strong></div></div><div class="aside-note"><span>ⓘ</span><p>Credits are a fictional demo score, not MON. No deposits, payouts or redemption.</p></div></aside>
+      </div>
+    </main>
+
+    <main id="screenJoin" class="screen inner-screen join-screen">
+      <div class="inner-heading"><button class="back-link" data-action="home">← BACK TO HOME</button><span class="step-tag">01 / JOIN ROOM</span></div>
+      <section class="join-card"><div class="join-header-bomb">✳</div><div class="eyebrow center"><span class="eyebrow-line"></span> THE SQUAD IS WAITING</div><h2>GOT A <span>CODE?</span></h2><p class="muted">Get the six-character room code from your friend and jump straight in.</p><div class="form-field"><label for="joinName">YOUR NICKNAME</label><input id="joinName" type="text" maxlength="16" value="RUSHER" placeholder="Your nickname" autocomplete="off" /></div><div class="form-field"><label for="joinCode">ROOM CODE</label><input id="joinCode" class="code-entry" type="text" maxlength="6" placeholder="RUSH42" spellcheck="false" autocapitalize="characters" autocomplete="off" /><small class="form-helper">Try demo code <button data-action="fill-demo-code">RUSH42</button> to explore the lobby.</small></div><div class="form-error" id="joinError" role="alert"></div><button class="btn btn-primary btn-block btn-big" data-action="confirm-join">JOIN ROOM <span class="btn-arrow">↗</span></button><button class="join-alt" data-action="create">Don't have a code? <strong>Create your own room →</strong></button></section>
+    </main>
+
+    <main id="screenLobby" class="screen inner-screen lobby-screen">
+      <div class="inner-heading"><button class="back-link" data-action="leave">← LEAVE ROOM</button><span class="step-tag"><span class="live-dot"></span> WAITING LOBBY</span></div>
+      <div class="lobby-title-row"><div><div class="section-label"><span class="square-dot"></span> YOU'RE IN</div><h2>THE CALM <span>BEFORE.</span></h2><p class="muted">Get your squad ready. When everyone's in, the chaos begins.</p></div><div class="code-tile"><span>ROOM CODE</span><div><strong id="lobbyCode">RUSH42</strong><button data-action="copy-code" title="Copy room code">⧉</button></div><small>SHARE THIS WITH FRIENDS</small></div></div>
+      <div class="lobby-main"><div class="lobby-left"><div class="panel-topline"><span>PLAYERS <span id="lobbyOccupancy">03 / 04</span></span><span class="sample-badge">LOCAL MOCK SEATS</span></div><div id="seatList" class="seat-list"></div><div class="lobby-controls"><button id="readyButton" class="btn btn-primary btn-big" data-action="toggle-ready">I'M READY <span>↗</span></button><button class="btn btn-outline btn-big" data-action="game-preview">SKIP TO UI PREVIEW <span>↗</span></button></div><p class="sim-note">UI demo: other seats are illustrated locally, not connected human players. The 15-second start countdown is simulated.</p></div>
+      <aside class="lobby-right"><div class="panel-topline"><span>MATCH SETTINGS</span><span>✳</span></div><div class="settings-info"><div><span>GAME MODE</span><strong>LAST ONE STANDING</strong></div><div><span>PLAYERS</span><strong id="lobbyMaxPlayers">04 PLAYERS</strong></div><div><span>ENTRY</span><strong id="lobbyEntry">100 VIRTUAL DEMO CREDITS</strong></div><div><span>SIMULATED POOL</span><strong id="lobbyPool">400 VIRTUAL DEMO CREDITS</strong></div><div><span>MATCH DURATION</span><strong id="lobbyDuration">30 SEC GAMEPLAY</strong></div><div><span>NETWORK</span><strong>MONAD TESTNET · PLANNED</strong></div></div><div class="countdown-panel" id="countdownPanel"><div class="countdown-pulse"><span>◷</span></div><span id="lobbyStatusTitle">AWAITING READY-UP</span><strong id="countdownValue">--</strong><small id="lobbyStatusHint">Hit ready when you're good to go.</small></div></aside></div>
+    </main>
+
+    <main id="screenGame" class="screen game-screen">
+      <div id="gameViewport" class="game-viewport"><canvas id="gameCanvas" aria-label="Interactive stylized 2.5D arena visualization"></canvas><div class="game-vignette"></div>
+        <div class="game-top-hud"><div class="hud-brand"><span class="brand-symbol tiny"><span class="brand-bomb"></span><i></i></span><strong>BOMB<span>RUSH</span></strong><small>UI DEMO</small></div><div class="hud-count"><span>PLAYERS ALIVE</span><strong id="aliveCount">4 / 4</strong></div><div class="timer-hud" id="timerHud"><small>⚠ BOMB DETONATES IN</small><strong id="gameTimer">10.00</strong><span>SECONDS</span></div><div class="hud-right"><span class="testnet-min">◈ LOCAL PREVIEW</span><button id="boardToggle" class="hud-icon-btn" data-action="scoreboard" aria-label="Toggle scoreboard">☷</button><button class="hud-icon-btn" data-action="game-settings" aria-label="Game settings">⚙</button></div></div>
+        <div class="round-info"><span id="roundLabel">ROUND 01 / 03</span><b></b><span id="bombOwner">BOMB HOLDER: YOU</span></div>
+        <div class="game-center-cue" id="gameCue"><div class="cue-symbol">●</div><strong>DON'T GET CAUGHT</strong><span>PASS IT BEFORE ZERO</span></div>
+        <div class="bomb-alert" id="bombAlert">⚠ YOU HAVE THE BOMB! <span>GET CLOSE & PASS</span></div>
+        <div id="gameToast" class="game-toast"></div>
+        <div id="scoreboard" class="scoreboard hidden"><div class="panel-topline"><span>SURVIVORS</span><button data-action="scoreboard">✕</button></div><div id="scoreList"></div></div>
+        <div id="gameSettings" class="game-settings hidden"><div class="panel-topline"><span>GAME SETTINGS</span><button data-action="game-settings">✕</button></div><label for="cameraZoom">CAMERA DISTANCE <span id="zoomLabel">9</span></label><input id="cameraZoom" type="range" min="7" max="11" step="0.5" value="9" /><p>Frontend visual preview only. Game events are not server-authoritative.</p><button class="btn btn-outline btn-block" data-action="leave-game">EXIT PREVIEW</button></div>
+        <div class="touch-camera-zone" id="touchCameraZone" aria-hidden="true"></div>
+        <div id="touchJoystick" class="touch-joystick"><div class="joystick-base"><div id="joystickKnob" class="joystick-knob"></div></div><span>MOVE</span></div>
+        <div class="touch-actions"><button id="touchRun" class="touch-run">RUN</button><button id="touchPass" class="touch-pass">PASS <span>↗</span></button></div>
+        <div class="game-bottom-hud"><div class="game-controls-help"><div class="game-player-indicator"><span class="local-avatar">R</span><div><small>YOU ARE PLAYING AS</small><strong id="playerHandle">RUSHER</strong></div></div><div class="keymap"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> MOVE</span><span><kbd>SHIFT</kbd> RUN</span><span><kbd>E</kbd> PASS</span><span><kbd>DRAG</kbd> ORBIT</span></div></div><div class="stamina-box"><div class="stamina-label"><span>⚡ STAMINA</span><strong id="staminaNumber">5.0 / 5</strong></div><div id="staminaBars" class="stamina-bars"><i></i><i></i><i></i><i></i><i></i></div></div></div>
+        <div class="rotate-overlay" id="rotateOverlay"><div class="rotate-icon">▯ <span>↻</span></div><h2>TURN TO <span>LANDSCAPE</span></h2><p>Rotate your phone for the full arena experience.</p><button data-action="exit-rotate" class="btn btn-outline">RETURN TO LOBBY</button></div>
+      </div>
+    </main>
+
+    <main id="screenResult" class="screen result-screen"><div class="result-stars" aria-hidden="true">✦ <span>✧</span> ✳</div><div class="result-content"><div class="result-eyebrow"><span class="eyebrow-line"></span> MATCH COMPLETE <span class="eyebrow-line"></span></div><div id="resultEmblem" class="result-emblem">★</div><h1 id="resultHeadline">LAST ONE <span>STANDING.</span></h1><p id="resultSubtitle">The arena has crowned its survivor.</p><div class="winner-tile"><span>WINNER OF THE ARENA</span><div class="winner-avatar" id="winnerAvatar">R</div><strong id="winnerName">RUSHER</strong><small id="winnerDescription">YOU SURVIVED THE CHAOS</small></div><div class="result-metrics"><div><small>MATCH TYPE</small><strong id="resultMode">4-PLAYER SURVIVAL</strong></div><div><small>SIMULATED POOL</small><strong id="resultCredits">400</strong><span>VIRTUAL DEMO CREDITS</span></div><div><small>BLOCKCHAIN RECORD</small><strong>NOT RECORDED</strong><span>FRONTEND-ONLY PREVIEW</span></div></div><div class="result-actions"><button class="btn btn-primary btn-big" data-action="rematch">PLAY AGAIN <span>↗</span></button><button class="btn btn-outline btn-big" data-action="home">BACK TO HOME</button></div><div class="result-legal">✳ Preview outcome is simulated in-browser, not a verified Monad result or real multiplayer session.</div></div></main>
+
+    <div id="helpModal" class="modal-layer hidden"><div class="modal-backdrop" data-action="close-modal"></div><section class="help-modal"><div class="modal-top"><span>PLAYER FIELD GUIDE</span><button data-action="close-modal" aria-label="Close">✕</button></div><h2>KNOW THE <span>RULES.</span></h2><p>Three or four contenders enter. A hot bomb changes hands. At zero, the holder is eliminated. Repeat until one player remains.</p><div class="help-row"><span>01</span><div><strong>10-SECOND BOMB</strong><small>The timer stays running when you pass it. Get close to another survivor first.</small></div></div><div class="help-row"><span>02</span><div><strong>GET WITHIN RANGE</strong><small>Press E or PASS to hand off to the closest eligible player within 1.8 units.</small></div></div><div class="help-row"><span>03</span><div><strong>SPRINT SMART</strong><small>Five stamina bars. Run drains one bar per second, recovery starts after a 1.5 second pause.</small></div></div><div class="controls-poster"><div><strong>DESKTOP</strong><p><kbd>WASD</kbd> Move · <kbd>SHIFT</kbd> Sprint · <kbd>E</kbd> Pass · <kbd>DRAG</kbd> Camera</p></div><div><strong>MOBILE · LANDSCAPE</strong><p>Left joystick · RUN · PASS · Swipe right side to orbit camera</p></div></div><button class="btn btn-primary btn-block" data-action="create">LET'S PLAY <span>↗</span></button></section></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </div>
+  <script src="./app.js"></script>
+</body>
+</html>
