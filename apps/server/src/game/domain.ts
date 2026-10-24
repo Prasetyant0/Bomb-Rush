@@ -20,6 +20,12 @@ export interface PlayerInput {
 export interface GameParticipant {
   participantId: string; // server-generated uuid, never client-supplied
   kind: ParticipantKind;
+  /**
+   * Wallet bound to this seat, lowercase. Required for a funded room: the
+   * contract settles only to a depositor, so a seat without a wallet can never
+   * win a pot. Null means "guest / unfunded", which is valid only in demo rooms.
+   */
+  walletAddress: string | null;
   ready: boolean;
   alive: boolean;
   stamina: number;
@@ -38,6 +44,15 @@ export interface GameParticipant {
 export interface RoomSession {
   roomId: string;
   code: string;
+  /**
+   * bytes32 contract identity, derived server-side as
+   * keccak256(abi.encodePacked('BOMB_RUSH_V05', chainId, nonce, hostAddress)).
+   * The contract cannot verify the derivation, so this value is the only bridge
+   * between the game room and the escrow. Null for a demo room with no escrow.
+   */
+  roomKey: string | null;
+  /** Escrow status mirrored from the chain. Never a guess. */
+  escrowStatus: 'NONE' | 'FUNDING' | 'FUNDED' | 'SETTLED' | 'CANCELED';
   roomStatus: RoomStatus; // P0: WAITING|COUNTDOWN|LIVE|FINISHED|CANCELED|ABORTED
   hostParticipantId: string; // server-minted participant id of the room host
   visibility: 'PUBLIC' | 'PRIVATE';
@@ -96,11 +111,15 @@ export function createRoom(
   visibility: 'PUBLIC' | 'PRIVATE',
   virtualDemoEntryWei: string,
   allowDemoBot: boolean,
+  /** Derived bytes32 when the host supplied a wallet; null = demo room. */
+  roomKey: string | null = null,
 ): RoomSession {
   const now = clock.now();
   return {
     roomId,
     code,
+    roomKey,
+    escrowStatus: 'NONE',
     roomStatus: 'WAITING',
     hostParticipantId,
     visibility,
@@ -130,7 +149,13 @@ const uuid =
     // deterministic-test seeds or ancient runtimes.
     `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-export function joinRoom(room: RoomSession, kind: ParticipantKind, clock: Clock): { errors: GameError[]; sessionToken: string; participant: GameParticipant } | { errors: GameError[] } {
+export function joinRoom(
+  room: RoomSession,
+  kind: ParticipantKind,
+  clock: Clock,
+  /** Already normalized (lowercase) by the caller; see escrow/roomKey.ts. */
+  walletAddress: string | null = null,
+): { errors: GameError[]; sessionToken: string; participant: GameParticipant } | { errors: GameError[] } {
   if (room.roomStatus !== 'WAITING') {
     return { errors: [{ code: ERROR_CODES.ROOM_NOT_JOINABLE, message: `Room status is ${room.roomStatus}; only WAITING is joinable.` }] };
   }
@@ -144,11 +169,17 @@ export function joinRoom(room: RoomSession, kind: ParticipantKind, clock: Clock)
   if (kind === 'DEMO_BOT' && room.participants.some((p) => p.kind === 'DEMO_BOT')) {
     return { errors: [{ code: ERROR_CODES.BAD_STATE, message: 'Only one demo bot per room.' }] };
   }
+  // One wallet per seat per room: a duplicated address would let one depositor
+  // occupy two seats, which the escrow's depositor check cannot distinguish.
+  if (walletAddress != null && room.participants.some((p) => p.walletAddress === walletAddress)) {
+    return { errors: [{ code: ERROR_CODES.BAD_STATE, message: 'That wallet already holds a seat in this room.' }] };
+  }
   const seatIndex = room.participants.length;
   const spawn = SPAWN_POINTS[seatIndex % SPAWN_POINTS.length];
   const participant: GameParticipant = {
     participantId: uuid(),
     kind,
+    walletAddress,
     ready: false,
     alive: true,
     stamina: GAME_RULES.STAMINA_MAX,
@@ -326,16 +357,14 @@ export function maybeStartMatch(room: RoomSession, clock: Clock): Outcomes {
     return { events: {}, errors: [] }; // not yet time
   }
   // Revalidate quorum per FLOWCHART.md §A E{Quorum still valid?}
-  const humans = room.participants.filter((p) => p.kind === 'HUMAN');
-  const bots = room.participants.filter((p) => p.kind === 'DEMO_BOT');
   if (room.participants.length < GAME_RULES.MIN_PLAYERS || room.participants.length > GAME_RULES.MAX_PLAYERS) {
     room.roomStatus = 'WAITING';
     room.countdownStartsAt = null;
     room.participants.forEach((p) => { p.ready = false; });
     return { events: { roomCountdownCanceled: { status: 'WAITING' } }, errors: [] };
   }
-  const botAllowed = room.allowDemoBot && room.participants.length >= GAME_RULES.MAX_PLAYERS ? true : (gamebotsOk(humans, bots));
-  if (!botAllowed) {
+  // v0.5: quorum is seat count, not human count. A bot may hold a funded seat.
+  if (!seatsMeetQuorum(room.participants)) {
     room.roomStatus = 'WAITING';
     room.countdownStartsAt = null;
     room.participants.forEach((p) => { p.ready = false; });
@@ -345,9 +374,15 @@ export function maybeStartMatch(room: RoomSession, clock: Clock): Outcomes {
   return startMatch(room, clock);
 }
 
-function gamebotsOk(humans: GameParticipant[], bots: GameParticipant[]): boolean {
-  if (bots.length === 0) return humans.length >= GAME_RULES.MIN_PLAYERS;
-  return humans.length >= GAME_RULES.MIN_HUMANS && humans.length + bots.length >= GAME_RULES.MIN_PLAYERS;
+/**
+ * Seat-count gate. v0.5 removes the "2 humans + bot" allowance: a match starts
+ * when MIN_PLAYERS seats are filled, whoever holds them. A bot may occupy a
+ * seat only when the operator funded it — that is a funding/UI concern
+ * (docs/DEMO_DECISIONS.md D2), not a rule the sim can check, because the sim
+ * never sees wallets.
+ */
+function seatsMeetQuorum(participants: GameParticipant[]): boolean {
+  return participants.length >= GAME_RULES.MIN_PLAYERS;
 }
 
 export function startMatch(room: RoomSession, clock: Clock): Outcomes {
@@ -444,11 +479,14 @@ export function tickRoom(room: RoomSession, clock: Clock): Outcomes {
       const speed = actuallySprinting ? GAME_RULES.SPRINT_SPEED : GAME_RULES.WALK_SPEED;
       p.position.x += p.lastInput.moveX * speed * dtSec;
       p.position.z += p.lastInput.moveZ * speed * dtSec;
-      // keep inside flat arena (design.md §2: ~20 units wide)
+      // keep inside the play surface. Clamp at MAX_POSITION_RADIUS, not
+      // ARENA_RADIUS: the difference is PLAYER_RADIUS, and the client clamps at
+      // the same value. Two different radii meant a networked client snapped on
+      // every snapshot. See docs/DEMO_DECISIONS.md D1.
       const r = Math.hypot(p.position.x, p.position.z);
-      if (r > GAME_RULES.ARENA_RADIUS) {
-        p.position.x = (p.position.x / r) * GAME_RULES.ARENA_RADIUS;
-        p.position.z = (p.position.z / r) * GAME_RULES.ARENA_RADIUS;
+      if (r > GAME_RULES.MAX_POSITION_RADIUS) {
+        p.position.x = (p.position.x / r) * GAME_RULES.MAX_POSITION_RADIUS;
+        p.position.z = (p.position.z / r) * GAME_RULES.MAX_POSITION_RADIUS;
       }
       p.facingYaw = Math.atan2(p.lastInput.moveX, p.lastInput.moveZ);
     }
@@ -624,7 +662,9 @@ export function roomPublicState(room: RoomSession): {
   minPlayers: number; maxPlayers: number;
   virtualDemoEntryWei: string;
   allowDemoBot: boolean; startAtMs: number | null;
-  participants: Array<{ participantId: string; ready: boolean; kind: ParticipantKind }>;
+  roomKey: string | null;
+  escrowStatus: RoomSession['escrowStatus'];
+  participants: Array<{ participantId: string; ready: boolean; kind: ParticipantKind; walletAddress: string | null }>;
 } {
   return {
     roomId: room.roomId,
@@ -635,7 +675,14 @@ export function roomPublicState(room: RoomSession): {
     virtualDemoEntryWei: room.virtualDemoEntryWei,
     allowDemoBot: room.allowDemoBot,
     startAtMs: room.roomStatus === 'COUNTDOWN' ? room.countdownStartsAt! + GAME_RULES.LOBBY_COUNTDOWN_MS : null,
-    participants: room.participants.map((p) => ({ participantId: p.participantId, ready: p.ready, kind: p.kind })),
+    roomKey: room.roomKey,
+    escrowStatus: room.escrowStatus,
+    participants: room.participants.map((p) => ({
+      participantId: p.participantId,
+      ready: p.ready,
+      kind: p.kind,
+      walletAddress: p.walletAddress,
+    })),
   };
 }
 

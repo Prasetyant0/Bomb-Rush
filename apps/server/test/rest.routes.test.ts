@@ -18,7 +18,7 @@ describe('REST contracts (API_CONTRACT §2)', () => {
     expect(r.statusCode).toBe(200);
     const j = r.json();
     expect(j.ok).toBe(true);
-    expect(j.rules).toBe('bomb-rush-v0.3');
+    expect(j.rules).toBe('bomb-rush-v0.5');
   });
 
   it('POST /api/rooms validates entry range: 0.01–10 test MON', async () => {

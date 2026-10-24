@@ -1,0 +1,3 @@
+# Generated harness state — never commit. Holds throwaway anvil dev keys.
+.local-chain.env
+.local-chain/

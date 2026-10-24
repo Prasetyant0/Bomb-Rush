@@ -11,7 +11,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css?v=2" />
   <script type="importmap">
-  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js" } }
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+      "socket.io-client": "https://cdn.jsdelivr.net/npm/socket.io-client@4.8.4/dist/socket.io.esm.min.js"
+  } }
   </script>
 </head>
 <body>
@@ -24,8 +27,23 @@
       <button data-action="how">CARA MAIN</button>
       <span class="netpill"><i></i> MONAD TESTNET · DEMO</span>
     </nav>
+    <div class="walletbar">
+      <span id="chainBadge" class="chainbadge" hidden>10143 · MONAD TESTNET</span>
+      <button id="walletBtn" class="btn mini wallet" data-action="wallet-connect" title="Hubungkan wallet Monad Testnet">
+        <span id="walletLabel">HUBUNGKAN WALLET</span>
+      </button>
+    </div>
     <button class="btn mini" data-action="create">MAIN SEKARANG <span>↗</span></button>
+    <div class="testnetstrip">MONAD TESTNET · NO REAL VALUE</div>
   </header>
+
+  <!-- Wrong chain / no chain: actionable, never a silent failure. -->
+  <div id="chainBanner" class="chainbanner" role="alert" hidden>
+    <b id="chainBannerTitle">JARINGAN SALAH</b>
+    <span id="chainBannerBody">Wallet harus di Monad Testnet (10143).</span>
+    <button class="btn mini" data-action="wallet-switch">PINDAH KE MONAD TESTNET</button>
+    <button class="x" data-action="banner-dismiss" aria-label="Tutup">✕</button>
+  </div>
 
   <main>
     <!-- ============ HOME ============ -->
@@ -102,10 +120,38 @@
           <button class="card sel" data-bot="fun"><b>DENGAN BOT</b><small>BOT mengikuti aturan yang sama</small></button>
           <button class="card" data-bot="solo"><b>TANPA BOT</b><small>kursi kosong, jika ada</small></button>
         </div>
+        <p class="foot">Kursi bot didanai wallet operator dengan deposit <code>joinRoom</code> nyata dan diberi label BOT di lobi, arena, dan hasil. Jika bot menang, hadiahnya ke wallet operator — tidak dialihkan diam-diam.</p>
       </div>
+
+      <!-- ============ FUNDED ROOM (on-chain) ============ -->
+      <div id="fundedBox" class="funded hidden">
+        <div class="fhead">
+          <span>ROOM BERDANA · ON-CHAIN</span>
+          <span class="tag">MONAD TESTNET · NO REAL VALUE</span>
+        </div>
+        <div class="kv"><span>WALLET</span><b id="fdWallet">—</b></div>
+        <div class="kv"><span>ESCROW</span><b id="fdEscrow">—</b></div>
+        <div class="kv"><span>BATAS KONTRAK</span><b id="fdBounds">membaca entryBounds()…</b></div>
+        <div class="field">
+          <label>ENTRY (MON) <small>DARI KONTRAK, BUKAN HARDCODE</small></label>
+          <div class="grid3">
+            <button class="chip" data-mono="0.001">0.001</button>
+            <button class="chip" data-mono="0.005">0.005</button>
+            <button class="chip" data-mono="0.01">0.01</button>
+          </div>
+          <div class="hintrow"><span>WEI PERSIS</span><input id="fdWei" readonly /></div>
+        </div>
+        <div class="kv"><span>POOL JIKA PENUH</span><b id="fdPool">—</b></div>
+        <div id="fdErr" class="err" role="alert"></div>
+        <button id="fdCreate" class="btn primary big block" data-action="funded-create" disabled>
+          CREATE &amp; DEPOSIT <span>↗</span>
+        </button>
+        <p class="foot">Tombol terkunci sampai wallet terhubung, berada di chain 10143, dan nominal berada di dalam batas kontrak. hash tx dikirim ke server untuk verifikasi receipt — hash saja bukan bukti.</p>
+      </div>
+
       <div id="fErr" class="err" role="alert"></div>
       <button class="btn primary big block" data-action="confirm-create">BUAT ROOM <span>↗</span></button>
-      <p class="foot">Tanpa wallet. Semua data demo hanya ada di browser ini. Aturan gameplay 100% server-authoritative (sim lokal = modul yang sama di-host server).</p>
+      <p class="foot">Tanpa wallet? Demo tetap jalan: saldo &amp; hasil lokal, tanpa transaksi. Aturan gameplay 100% server-authoritative (sim lokal = modul yang sama di-host server).</p>
     </section>
 
     <!-- ============ LOBBY ============ -->
@@ -116,22 +162,30 @@
         <div class="codetile"><small>KODE ROOM</small><b id="lbCode">RUSH42</b><button class="copy" data-action="copy-code" title="Salin kode">⧉</button><small>bagikan ke teman</small></div>
       </div>
       <div class="panel">
-        <div class="panel-top"><span>PEMAIN <span id="lbOcc">04 / 04</span></span><span class="badge">LEAKS USER — idle seat</span></div>
+        <div class="panel-top"><span>PEMAIN <span id="lbOcc">04 / 04</span></span><span id="lbPoolBadge" class="badge">MONAD TESTNET · NO REAL VALUE</span></div>
         <div id="lbSeats" class="seats"></div>
         <div class="lobby-cta">
           <button id="lbReady" class="btn primary big" data-action="toggle-ready">SAYA SIAP <span>↗</span></button>
           <button class="btn outline big" data-action="start">SKIP KE MATCH <span>↗</span></button>
         </div>
-        <p class="foot">UI demo: kursi lain dilokal, bukan pemain manusia. Angka hitung mundur 15 detik disimulasikan lokal.</p>
+        <div id="lbJoinRow" class="lobby-join hidden">
+          <button id="lbJoin" class="btn primary block" data-action="join-deposit">
+            IKUT &amp; DEPOSIT <span>↗</span>
+          </button>
+          <p class="foot">Kursi ini belum didanai. Deposit <code>joinRoom</code> mengirim tepat <b id="lbJoinAmt">—</b> MON ke escrow untuk room ini.</p>
+        </div>
+        <p id="lbFoot" class="foot">UI demo: kursi lain dilokal, bukan pemain manusia. Angka hitung mundur 15 detik disimulasikan lokal.</p>
       </div>
       <div class="panel info">
         <div class="panel-top"><span>PENGATURAN MATCH</span><span>✳</span></div>
         <div class="kv"><span>MODE</span><b>LAST ONE STANDING</b></div>
         <div class="kv"><span>SEATS</span><b id="lbSeatsN">04</b></div>
         <div class="kv"><span>ENTRY</span><b id="lbEntry">100 KREDITS DEMO</b></div>
-        <div class="kv"><span>POOL SIM</span><b id="lbPool">400 KREDITS DEMO</b></div>
+        <div class="kv"><span>POOL</span><b id="lbPool">400 KREDITS DEMO</b></div>
         <div class="kv"><span>DURASI</span><b id="lbDur">30 DETIK NOMINAL</b></div>
-        <div class="kv"><span>JARINGAN</span><b>MONAD TESTNET · 10143</b></div>
+        <div class="kv"><span>JARINGAN</span><b id="lbNet">MONAD TESTNET · 10143</b></div>
+        <div id="lbKeyRow" class="kv hidden"><span>ROOM KEY (on-chain)</span><b><span id="lbKey">—</span> <button class="copy" data-action="copy-roomkey" title="Salin roomKey">⧉</button></b></div>
+        <div id="lbDepositRow" class="kv hidden"><span>DEPOSIT HOST</span><b><a id="lbDepositLink" target="_blank" rel="noopener noreferrer">—</a></b></div>
         <div class="count"><small id="lbCountTitle">MENUNGGU SIAP</small><b id="lbCount">--</b><small id="lbCountHint">tekan "SAYA SIAP" untuk memulai</small></div>
       </div>
     </section>
@@ -198,14 +252,26 @@
       </div>
       <div class="mets">
         <div><small>TIPE</small><b id="rMode">4-PLAYER SURVIVAL</b></div>
-        <div><small>POOL SIMULASI</small><b id="rPool">400</b><span>KREDITS DEMO · TANPA NILAI</span></div>
-        <div><small>CATATAN BLOCKCHAIN</small><b>BELUM DICATAT</b><span>TANPA BACKEND — STATUS JUJUR</span></div>
+        <div><small>POOL</small><b id="rPool">400</b><span id="rPoolUnit">KREDITS DEMO · TANPA NILAI</span></div>
+        <div><small>CATATAN BLOCKCHAIN</small><b id="rChain">BELUM DICATAT</b><span id="rChainSub">TANPA BACKEND — STATUS JUJUR</span></div>
+      </div>
+      <div id="rChainBox" class="chainbox hidden">
+        <div class="chainflow">
+          <span class="cstep" data-step="PENDING"><i></i>PENDING</span>
+          <span class="carrow">→</span>
+          <span class="cstep" data-step="CLAIMABLE"><i></i>CONFIRMED</span>
+          <span class="carrow">→</span>
+          <span class="cstep" data-step="PAID"><i></i>PAID</span>
+        </div>
+        <div id="rTxLinks" class="txlinks"></div>
+        <p id="rChainNote" class="foot"></p>
       </div>
       <div class="ract">
         <button class="btn primary big" data-action="rematch">MAIN LAGI <span>↗</span></button>
         <button class="btn outline big" data-action="home">KEMBALI KE HOME</button>
       </div>
       <p class="legal">✳ Hasil disimulasikan di-browser — bukan hasil Monad terverifikasi maupun sesi multiplayer nyata.</p>
+      <p class="legal testnet">MONAD TESTNET · NO REAL VALUE</p>
     </section>
   </main>
 

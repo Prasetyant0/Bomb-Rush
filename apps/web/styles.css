@@ -287,3 +287,73 @@ kbd { padding: 4px 6px; background: #211b2ddd; border: 1px solid #564764; font: 
   .hero h1 { font-size: clamp(60px, 17vw, 96px); }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+/* ---------- wallet / chain (web3) ---------- */
+.walletbar { display: flex; align-items: center; gap: 10px; }
+.btn.wallet { border: 1px solid #5b4a75; background: #221b33; color: #e7ddff; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn.wallet.ok { border-color: #4d7a5c; background: #1b2b24; color: #b6e7c6; }
+.btn.wallet.bad { border-color: #7a4d55; background: #2b1b1e; color: #ffb3ba; }
+.chainbadge { font-size: 9px; font-weight: 900; letter-spacing: .8px; padding: 5px 8px; background: #1e3328; color: #9fe0b4; border: 1px solid #3f6b50; }
+.chainbadge.bad { background: #3a1f24; color: #ffb3ba; border-color: #7a4d55; }
+.chainbanner { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 64px; background: #3a1f24; color: #ffd9dc; border-bottom: 1px solid #7a4d55; font-size: 11px; font-weight: 700; }
+.chainbanner[hidden] { display: none; }
+.chainbanner b { letter-spacing: 1px; font-size: 10px; }
+.chainbanner span { color: #f0c3c8; flex: 1; min-width: 180px; }
+.chainbanner .x { color: #f0c3c8; font-size: 12px; padding: 2px 6px; }
+.chainbanner .btn { background: #ff667e; color: #2a1014; }
+
+/* funded room box on the create screen */
+.funded { border: 1px solid #4a3f68; background: #1a1526; padding: 0 0 14px; display: grid; }
+.funded[hidden] { display: none; }
+.fhead { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid #4a3f68; font-size: 10px; font-weight: 900; letter-spacing: 1px; color: #cbb8ff; }
+.fhead .tag { font-size: 8px; letter-spacing: .5px; color: #9fe0b4; background: #1e3328; border: 1px solid #3f6b50; padding: 4px 6px; }
+.funded .kv { padding: 10px 18px; }
+.funded .field { padding: 12px 18px 0; }
+.funded .err, .funded .foot, .funded .btn.block { margin: 0 18px; }
+.funded .foot { margin-top: 10px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.funded .chip { min-height: 42px; font: 900 20px var(--fd); }
+.funded input[readonly] { font-family: ui-monospace, monospace; font-size: 12px; color: #b9a7ff; }
+.btn[disabled] { opacity: .42; cursor: not-allowed; transform: none !important; filter: none !important; }
+
+/* lobby seat funding state */
+.seat .fund { font-size: 8px; font-weight: 900; letter-spacing: .7px; padding: 3px 6px; margin-left: 6px; vertical-align: 1px; display: inline-block; }
+.seat .fund.yes { color: #9fe0b4; background: #1e3328; border: 1px solid #3f6b50; }
+.seat .fund.no { color: #ffb3ba; background: #3a1f24; border: 1px solid #7a4d55; }
+.seat .fund.bot { color: #f6d79f; background: #3a2f1e; border: 1px solid #7a6a4d; }
+.seat .walletaddr { font-family: ui-monospace, monospace; font-size: 9px; color: #a99dcc; letter-spacing: 0; }
+.seat.unfunded { opacity: .78; border-color: #6b4149; }
+
+/* result chain flow */
+.chainbox { border: 1px solid #40364d; background: #171321; padding: 16px 20px; display: grid; gap: 12px; max-width: 720px; justify-self: center; width: 100%; }
+.chainbox[hidden] { display: none; }
+.chainflow { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.cstep { display: inline-flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 900; letter-spacing: 1px; color: #77718a; padding: 7px 11px; border: 1px solid #3a3348; background: #1b1724; }
+.cstep i { width: 8px; height: 8px; border-radius: 50%; background: #4b4560; }
+.cstep.on { color: #e7ddff; border-color: #8367ef; background: #2a2140; }
+.cstep.on i { background: var(--purple); box-shadow: 0 0 9px var(--purple); }
+.cstep.done { color: #9fe0b4; border-color: #3f6b50; background: #1b2b24; }
+.cstep.done i { background: #7ed957; box-shadow: 0 0 9px #7ed957; }
+.cstep.fail { color: #ffb3ba; border-color: #7a4d55; background: #2b1b1e; }
+.cstep.fail i { background: #ff667e; }
+.carrow { color: #5c5570; font-size: 12px; }
+.txlinks { display: grid; gap: 6px; justify-items: center; }
+.txlinks a { color: #b9a7ff; font-size: 10px; font-weight: 800; letter-spacing: .5px; text-decoration: underline; word-break: break-all; text-align: center; }
+.txlinks span { color: #8d859e; font-size: 10px; font-weight: 700; }
+.legal.testnet { color: #9fe0b4; letter-spacing: 1.2px; font-size: 9px; }
+
+@media (max-width: 1100px) { .chainbanner { padding-left: 30px; padding-right: 30px; } }
+@media (max-width: 700px) {
+  .walletbar .chainbadge { display: none; }
+  .chainbanner { padding-left: 20px; padding-right: 20px; }
+  .grid3 { grid-template-columns: 1fr; }
+}
+.lobby-join { padding: 0 20px 16px; display: grid; gap: 8px; }
+.lobby-join.hidden { display: none; }
+.lobby-join .foot { padding: 0; }
+#topbar { flex-wrap: wrap; }
+.testnetstrip { display: block; width: 100%; text-align: center; font-size: 8px; font-weight: 900; letter-spacing: 1.4px; color: #7f9c8a; padding-top: 2px; }
+body.playing #topbar { display: none; }
+.kv.hidden { display: none; }
+.kv .copy { background: #493461; color: var(--purple); font-size: 11px; padding: 2px 6px; margin-left: 4px; }
+.kv a { color: #b9a7ff; font-size: 10px; font-weight: 800; text-decoration: underline; word-break: break-all; }

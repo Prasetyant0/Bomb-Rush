@@ -2,8 +2,12 @@
 // No public REST route permits setting winner or bypassing event contracts.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { GAME_RULES } from '@bomb-rush/shared';
+import { GAME_RULES, RULE_VERSION } from '@bomb-rush/shared';
 import type { RoomStore } from '../game/store.js';
+import { normalizeWallet } from '../escrow/roomKey.js';
+
+/** Accepts lowercase, uppercase or a correct EIP-55 checksum. */
+const walletSchema = z.string().refine((s) => normalizeWallet(s) !== null, 'must be a valid EVM address');
 
 const createRoomSchema = z.object({
   visibility: z.enum(['PUBLIC', 'PRIVATE']).default('PUBLIC'),
@@ -17,14 +21,29 @@ const createRoomSchema = z.object({
       return n >= 10n ** 16n && n <= 10n ** 19n;
     }, 'entry must be 0.01–10 test-MON-denominated virtual points'),
   allowDemoBot: z.boolean().default(false),
+  /**
+   * Host wallet + the escrow roomKey the HOST created on-chain. The roomKey is
+   * verified server-side against getRoom/entryBounds before it is accepted;
+   * it is never derived here.
+   */
+  hostWalletAddress: walletSchema.optional(),
+  roomKey: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'must be a bytes32 hex string').optional(),
 });
 
-export function registerRoutes(app: FastifyInstance, store: RoomStore) {
+export interface ChainHealth {
+  enabled: boolean;
+  detail: string;
+  /** Result of the boot selfCheck; null until it has run (or if disabled). */
+  selfCheck: null | { ok: boolean; chainId?: number; hasSettlerRole?: boolean; error?: string };
+}
+
+export function registerRoutes(app: FastifyInstance, store: RoomStore, chainHealth?: () => ChainHealth) {
   app.get('/health', async () => ({
     ok: true,
-    version: '0.3.1',
+    version: RULE_VERSION,
     time: new Date().toISOString(),
-    rules: 'bomb-rush-v0.3',
+    rules: RULE_VERSION,
+    chain: chainHealth ? chainHealth() : undefined,
   }));
 
   // Public room summaries only (API_CONTRACT §2): PRIVATE rooms stay out of the browser.
@@ -46,22 +65,44 @@ export function registerRoutes(app: FastifyInstance, store: RoomStore) {
     // host identity: MVP uses a server-issued sessionId cookie substitute.
     // ponytail: guest-mode session, SIWE/wallet auth deferred until Dev C lands wagmi.
     const hostSessionId = crypto.randomUUID();
-    const { roomId, code, participantId, sessionToken, visibility } = store.createRoom(
+    const created = await store.createRoom(
       hostSessionId,
       parsed.data.virtualDemoEntryWei,
       parsed.data.allowDemoBot,
       parsed.data.visibility,
+      parsed.data.hostWalletAddress ?? null,
+      parsed.data.roomKey ?? null,
     );
-    return reply.code(201).send({ roomId, code, participantId, sessionToken, status: 'WAITING', visibility, hostSessionId });
+    if (created.errors.length > 0) {
+      const code = created.errors[0].code;
+      const status = code === 'BAD_STATE' ? 502 : 400;
+      return reply.code(status).send({ error: code, message: created.errors[0].message });
+    }
+    return reply.code(201).send({
+      roomId: created.roomId,
+      code: created.code,
+      participantId: created.participantId,
+      sessionToken: created.sessionToken,
+      status: 'WAITING',
+      visibility: created.visibility,
+      hostSessionId: created.hostSessionId,
+      roomKey: created.roomKey ?? null,
+    });
   });
 
   app.post('/api/rooms/:roomId/join', async (req, reply) => {
     const { roomId } = req.params as { roomId: string };
-    const body = z.object({ kind: z.enum(['HUMAN', 'DEMO_BOT']).default('HUMAN') }).safeParse(req.body ?? {});
+    const body = z.object({
+      kind: z.enum(['HUMAN', 'DEMO_BOT']).default('HUMAN'),
+      walletAddress: walletSchema.optional(),
+    }).safeParse(req.body ?? {});
     if (!body.success) {
-      return reply.code(400).send({ error: 'BAD_PAYLOAD', detail: 'kind must be HUMAN or DEMO_BOT' });
+      return reply.code(400).send({
+        error: 'BAD_PAYLOAD',
+        detail: body.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      });
     }
-    const res = store.joinRoom(roomId, body.data.kind);
+    const res = store.joinRoom(roomId, body.data.kind, body.data.walletAddress ?? null);
     if (res.errors.length > 0) {
       const code = res.errors[0].code;
       const status = code === 'ROOM_FULL' ? 403 : code === 'ROOM_NOT_JOINABLE' ? 409 : 400;
@@ -72,6 +113,34 @@ export function registerRoutes(app: FastifyInstance, store: RoomStore) {
       sessionToken: res.sessionToken,
       room: store.roomState(roomId),
     });
+  });
+
+  // Deposit confirmation: verify the on-chain deposit receipt for THIS room,
+  // then mirror the escrow status. Idempotent per txHash.
+  app.post('/api/rooms/:roomId/deposit-confirm', async (req, reply) => {
+    const { roomId } = req.params as { roomId: string };
+    const body = z.object({
+      txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'must be a 32-byte 0x-prefixed hash'),
+      walletAddress: walletSchema,
+    }).safeParse(req.body ?? {});
+    if (!body.success) {
+      return reply.code(400).send({
+        error: 'BAD_PAYLOAD',
+        detail: body.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      });
+    }
+    const out = await store.confirmDeposit(roomId, body.data);
+    if (out.errors.length > 0) {
+      const code = out.errors[0].code;
+      const status = code === 'ROOM_NOT_JOINABLE' ? 404 : code === 'NOT_IN_ROOM' ? 403 : 400;
+      return reply.code(status).send({ error: code, message: out.errors[0].message });
+    }
+    return {
+      confirmed: true,
+      idempotent: out.idempotent ?? false,
+      escrowStatus: out.escrowStatus,
+      room: store.roomState(roomId),
+    };
   });
 
   app.get('/api/rooms/:roomId', async (req, reply) => {
@@ -101,14 +170,18 @@ export function registerRoutes(app: FastifyInstance, store: RoomStore) {
     const { matchId } = req.params as { matchId: string };
     for (const room of store.allRooms()) {
       if (room.matchId === matchId && room.roomStatus === 'FINISHED') {
-        // P0: winner is server-adjudicated; chain record status is PENDING until
-        // the Monad testnet recorder lands. Never a fabricated tx hash.
+        // Chain record state mirrors the escrow status; never a fabricated tx hash.
         return {
           matchId,
           status: room.roomStatus,
           winnerId: room.winnerId,
           virtualPool: room.virtualDemoEntryWei,
-          chainRecord: { state: 'PENDING' as const, explorerUrl: null },
+          roomKey: room.roomKey,
+          chainRecord: {
+            state: room.escrowStatus === 'SETTLED' ? ('SETTLED' as const) : ('PENDING' as const),
+            escrowStatus: room.escrowStatus,
+            explorerUrl: null,
+          },
         };
       }
     }

@@ -6,7 +6,10 @@
 import * as THREE from "three";
 import { PALETTE, mat } from "./style.js";
 
-export const ARENA_RADIUS = 10;
+// v0.5 arena radius. The play clamp is MAX_POSITION_RADIUS (6.6) in sim.js and
+// on the server; this constant only sizes the mesh, so the rim sits just outside
+// where a player can stand rather than far beyond it.
+export const ARENA_RADIUS = 7;
 
 export function createArena() {
   const arena = new THREE.Group();

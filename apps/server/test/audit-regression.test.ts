@@ -202,7 +202,9 @@ describe('movement authority regression', () => {
       tickRoom(room, clock);
     }
     const dist = p.position.x - centerX;
-    expect(dist).toBeCloseTo(GAME_RULES.SPRINT_SPEED, 1); // exactly 7.0 across 1 s
+    // v0.5 clamps at MAX_POSITION_RADIUS (6.6), which is below 1 s of sprint
+    // travel, so the wall — not the speed — is what stops the player here.
+    expect(dist).toBeCloseTo(Math.min(GAME_RULES.SPRINT_SPEED, GAME_RULES.MAX_POSITION_RADIUS), 1);
     expect(dist).toBeLessThanOrEqual(GAME_RULES.SPRINT_SPEED + 0.01);
   });
 
@@ -210,13 +212,17 @@ describe('movement authority regression', () => {
     const clock = makeClock();
     const { room, ids } = makeLiveRoom(clock);
     const p = room.participants.find((x) => x.participantId === ids[0])!;
-    p.position = { x: 0, y: 0, z: 0 };
+    // Start off-centre so 2 s of walking stays inside the 6.6 arena clamp and
+    // the assertion measures the dt clamp rather than the wall.
+    p.position = { x: -GAME_RULES.MAX_POSITION_RADIUS + 1, y: 0, z: 0 };
+    const startX = p.position.x;
     p.lastInput = { sequence: 1, moveX: 1, moveZ: 0, sprint: false }; // 4.5 u/s
     clock.advance(5000); // huge stall
     tickRoom(room, clock);
+    const moved = p.position.x - startX;
     // clampDt caps at 2 s → at most 9 units moved (not 22.5)
-    expect(p.position.x).toBeLessThanOrEqual(GAME_RULES.WALK_SPEED * 2.0 + 0.001);
-    expect(p.position.x).toBeGreaterThanOrEqual(GAME_RULES.WALK_SPEED * 2.0 - 0.001);
+    expect(moved).toBeLessThanOrEqual(GAME_RULES.WALK_SPEED * 2.0 + 0.001);
+    expect(moved).toBeGreaterThanOrEqual(GAME_RULES.WALK_SPEED * 2.0 - 0.001);
   });
 
   it('diagonal input clamped to unit magnitude (GS-04 placeholder — merged into applyInput test)', () => {

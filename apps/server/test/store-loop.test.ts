@@ -54,17 +54,18 @@ describe('Store loop re-arms itself (regression)', () => {
   it('full lobby room reaches LIVE via real fake-time loop (no tickNow call)', async () => {
     const t = fakeTimers();
     const store = new RoomStore({ clock: { now: t.now }, timers: t });
-    const r = store.createRoom('h', '1000000000000000000', false);
-    const j1 = store.joinRoom(r.roomId, 'HUMAN');
-    const j2 = store.joinRoom(r.roomId, 'HUMAN');
-    store.setReady(r.roomId, r.participantId, true);
-    store.setReady(r.roomId, j1.participantId!, true);
-    store.setReady(r.roomId, j2.participantId!, true);
-    expect(store.getRoom(r.roomId)!.roomStatus).toBe('COUNTDOWN');
+    const r = await store.createRoom('h', '1000000000000000000', false);
+    const roomId = r.roomId!;
+    const j1 = store.joinRoom(roomId, 'HUMAN');
+    const j2 = store.joinRoom(roomId, 'HUMAN');
+    store.setReady(roomId, r.participantId!, true);
+    store.setReady(roomId, j1.participantId!, true);
+    store.setReady(roomId, j2.participantId!, true);
+    expect(store.getRoom(roomId)!.roomStatus).toBe('COUNTDOWN');
     // advance well past 15 s countdown WITHOUT ever calling tickNow
     t.advance(GAME_RULES.LOBBY_COUNTDOWN_MS + 5_000);
-    expect(store.getRoom(r.roomId)!.roomStatus).toBe('LIVE');
-    expect(store.getRoom(r.roomId)!.matchId).toBeTruthy();
+    expect(store.getRoom(roomId)!.roomStatus).toBe('LIVE');
+    expect(store.getRoom(roomId)!.matchId).toBeTruthy();
     store.stop();
   });
 

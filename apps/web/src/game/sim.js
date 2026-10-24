@@ -5,7 +5,13 @@
 // Clock contract (SYS.md monotonic): NEVER integrate from packet/frame counts. step()
 // takes dt clamped to MAX_DT so a stalled loop produces a small jump, not teleport.
 
-export const ARENA_RADIUS = 10; // matches ArenaScene.js
+// v0.5 arena. MAX_POSITION_RADIUS is the clamp on BOTH sides — the server uses
+// the same value, so a networked client no longer snaps on every snapshot.
+// ArenaScene.js draws at ARENA_RADIUS.
+export const ARENA_RADIUS = 7.0;
+export const PLAYER_RADIUS = 0.4;
+export const MAX_POSITION_RADIUS = 6.6; // ARENA_RADIUS - PLAYER_RADIUS
+export const SPAWN_RING_RADIUS = 4.2; // ARENA_RADIUS * 0.6
 export const WALK_SPEED = 4.5; // units/s
 export const SPRINT_SPEED = 7.0; // units/s
 export const STAMINA_MAX = 5.0; // bars
@@ -19,7 +25,6 @@ export const PASS_COOLDOWN = 0.7; // s since passser's last successful pass
 export const LOCKBACK = 1.0; // s the former holder is blocked as target (GC §5)
 export const SEATS = 4;
 export const MAX_DT = 0.1; // per-tick clamp (SYS.md)
-export const PLAYER_RADIUS = 0.55; // soft-separation half distance
 
 export class V {
   constructor(x = 0, z = 0) { this.x = x; this.z = z; }
@@ -34,12 +39,11 @@ export class V {
 }
 
 // keep inside the octagonal arena (used by both movement and separation push).
-// Margin 1.0 = visual rim (torus at r=10, tube 0.35) + full avatar half-width,
-// so the whole mesh stays off the barrier — not just the center point.
+// Margin 1.0 was for the old r=10 visual rim. At v0.5 the clamp is the spec's
+// MAX_POSITION_RADIUS, identical to the server's, so client and server agree.
 export function clampArena(pos) {
   const len = pos.len();
-  const max = ARENA_RADIUS - 1.0;
-  if (len > max) pos.mul(max / len);
+  if (len > MAX_POSITION_RADIUS) pos.mul(MAX_POSITION_RADIUS / len);
 }
 
 export function makeRoom(code = "ROOM") {
@@ -73,7 +77,10 @@ export function startRound(room, seed = Math.random()) {
   const base = seed * Math.PI * 2;
   room.players.forEach((p, i) => {
     const ang = base + (i / n) * Math.PI * 2;
-    p.pos.set(Math.cos(ang) * 6, Math.sin(ang) * 6);
+    p.pos.set(
+      Math.cos(ang) * SPAWN_RING_RADIUS,
+      Math.sin(ang) * SPAWN_RING_RADIUS,
+    );
     p.move.set(0, 0);
     p.stamina = STAMINA_MAX;
     p.isSprinting = p.wantsSprint = p.moving = false;

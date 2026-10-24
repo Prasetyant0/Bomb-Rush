@@ -2,14 +2,38 @@
 // All game rules live in game/domain.ts; this file never decides game state.
 import type { Server, Socket } from 'socket.io';
 import { socketSchemas, PROTOCOL_VERSION, GAME_RULES } from '@bomb-rush/shared';
+import type { Hex } from 'viem';
 import { RoomStore } from '../game/store.js';
 import { SessionRegistry } from './sessions.js';
 import { makeTokenBucket, type RateLimiter } from './rateLimit.js';
+import { buildResultCommitment } from '../escrow/result.js';
+import { settleMatch, type SettlementChain, type ChainStatusEvent } from '../escrow/settlement.js';
 
 const TICK_MS = 1000 / GAME_RULES.SERVER_TICK_HZ; // 50ms server loop
-const SNAPSHOT_TICKS = 2; // ~10 snapshots/sec (API_CONTRACT §5)
+// Snapshot cadence derived from the shared constants: 20 Hz sim / 15 Hz
+// snapshots = emit every 4th tick (rounding up so we never exceed the rate).
+const SNAPSHOT_TICKS = Math.max(
+  1,
+  Math.round(GAME_RULES.SERVER_TICK_HZ / GAME_RULES.SNAPSHOT_HZ),
+);
 
-export function attachSocketHandlers(io: Server, store: RoomStore, sessions: SessionRegistry) {
+export interface SocketAdapterOptions {
+  /**
+   * Chain settlement boundary. Null = chain disabled: no settlement is
+   * attempted and the game behaves exactly as before.
+   */
+  settlementChain?: SettlementChain | null;
+}
+
+export function attachSocketHandlers(
+  io: Server,
+  store: RoomStore,
+  sessions: SessionRegistry,
+  options: SocketAdapterOptions = {},
+) {
+  const settlementChain = options.settlementChain ?? null;
+  // One settlement attempt per match, however many times an event fires.
+  const settledMatches = new Set<string>();
   // Rate limits key on participantId when the session is known, else socket.id
   // — so reconnecting into a fresh socketId cannot reset the budget.
   const inputLimiter = makeTokenBucket({ eventsPerInterval: GAME_RULES.SERVER_TICK_HZ * 1.5, intervalMs: 1000, maxBurst: 45 }); // 30/s nominal
@@ -131,6 +155,12 @@ export function attachSocketHandlers(io: Server, store: RoomStore, sessions: Ses
     });
   });
 
+  // Deposit confirmations arrive over REST; mirror the resulting escrow status
+  // to everyone in the room so the UI does not have to poll.
+  store.setChainStatusCallback((roomId, status) => {
+    io.to(`room:${roomId}`).emit('chain:status', status);
+  });
+
   // Wire store events (authoritative decisions) to socket broadcasts.
   store.setEventCallback((roomId, events) => {
     const room = store.getRoom(roomId);
@@ -167,10 +197,53 @@ export function attachSocketHandlers(io: Server, store: RoomStore, sessions: Ses
     if (events.matchFinished) {
       io.to(roomKey).emit('match:event', { type: 'RECONNECT', actorId: undefined, tick: room.tick });
       if (events.matchFinished.winnerId) {
+        // A hash is emitted ONLY when it can be computed from real inputs
+        // (roomKey + winner wallet). Otherwise resultHash is null — never a
+        // placeholder, because a fake hash is indistinguishable from a real
+        // commitment to any observer.
+        const commitment = buildResultCommitment(room);
         io.to(roomKey).emit('match:finished', {
           matchId: events.matchFinished.matchId,
           winnerId: events.matchFinished.winnerId,
-          resultHash: '0xplaceholder', // P0: hash committed when chain recorder lands tomorrow
+          resultHash: commitment.ok ? commitment.commitment.hash : null,
+        });
+
+        // P2: settle only with a real commitment, a real chain, and a room key.
+        if (commitment.ok && settlementChain && room.roomKey) {
+          const matchId = events.matchFinished.matchId;
+          if (!settledMatches.has(matchId)) {
+            settledMatches.add(matchId);
+            const emitStatus = (status: ChainStatusEvent) =>
+              io.to(roomKey).emit('chain:status', { ...status, matchId });
+            void settleMatch(
+              {
+                roomKey: room.roomKey as Hex,
+                winner: commitment.commitment.winnerWallet,
+                resultHash: commitment.commitment.hash,
+              },
+              emitStatus,
+              settlementChain,
+            ).then((final) => {
+              // Mirror only a chain-backed truth. CONFIRMED means the settle
+              // receipt landed, so the escrow status really is SETTLED; a
+              // failed payout leaves prizePaid=false, and the event's
+              // payoutState:'CLAIMABLE' is what tells the UI it is unclaimed.
+              if (final.state === 'CONFIRMED') {
+                room.escrowStatus = 'SETTLED';
+              }
+              const latest = store.roomState(roomId);
+              if (latest) io.to(roomKey).emit('room:state', latest);
+            }).catch((err) => {
+              const reason = err instanceof Error ? err.message : String(err);
+              io.to(roomKey).emit('chain:status', { state: 'FAILED', reason, matchId });
+            });
+          }
+        }
+      } else {
+        io.to(roomKey).emit('match:finished', {
+          matchId: events.matchFinished.matchId,
+          winnerId: null,
+          resultHash: null,
         });
       }
       const state = store.roomState(roomId);

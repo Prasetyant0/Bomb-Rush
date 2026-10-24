@@ -2,38 +2,68 @@ import { z } from 'zod'; // pinned via imports map: zod -> zod@3.24.1
 
 
 // ---------------------------------------------------------------------------
-// Constants — canonical values from TRD.md §13 (GAME_RULES), API_CONTRACT 0.3.
-// Tuned after playtest; shared between server (authoritative) and clients (UI).
+// Constants — canonical values from docs/spec/API_CONTRACT.md §1 (v0.5).
+// Shared between the server (authoritative) and clients (UI).
+//
+// Deviations from the spec are recorded in docs/DEMO_DECISIONS.md, not here.
 // ---------------------------------------------------------------------------
 
 export const GAME_RULES = {
   MIN_PLAYERS: 3,
   MAX_PLAYERS: 4,
-  MIN_HUMANS: 2, // DECISIONS.md Lobby: min 2 humans if demo bot fills a seat
+  // DECISIONS.md D02 requires 3-4 HUMANS with no bot in P0. A bot MAY fill a
+  // seat only when funded by the operator wallet and disclosed in the UI — see
+  // docs/DEMO_DECISIONS.md D2. MIN_HUMANS is therefore not a rule constant:
+  // the gate is MIN_PLAYERS funded seats, whoever holds them.
   WALK_SPEED: 4.5,
   SPRINT_SPEED: 7.0,
   STAMINA_MAX: 5.0,
   SPRINT_DRAIN_PER_SEC: 1.0,
   STAMINA_REGEN_DELAY_MS: 1500,
   STAMINA_REGEN_PER_SEC: 1.0,
-  SPRINT_REENABLE_STAMINA: 0.5, // GAMEPLAY_CONTROLS §4 anti-flicker threshold
+  SPRINT_REENABLE_THRESHOLD: 0.5, // GAMEPLAY_CONTROLS §4 anti-flicker threshold
   BOMB_CYCLE_MS: 10_000,
   PASS_RANGE: 1.8,
   PASS_COOLDOWN_MS: 700,
   PASS_RETURN_LOCK_MS: 1000,
   LOBBY_COUNTDOWN_MS: 15_000,
   SERVER_TICK_HZ: 20,
-  SNAPSHOT_HZ: 10,
-  RECONNECT_GRACE_MS: 3000,
+  SNAPSHOT_HZ: 15,
+  RECONNECT_GRACE_MS: 5000,
   ROOM_EXPIRY_MS: 600_000,
-  ARENA_RADIUS: 10, // design.md: ~20 world units wide
-  SPAWN_RING_RADIUS: 6,
-  DISCONNECT_KICK_MS: 10_000, // hard disconnect after grace with no reconnect
+
+  // Arena — v0.5. Both client and server clamp at MAX_POSITION_RADIUS. They
+  // used to clamp at different radii (server 10, client 9), which made a
+  // networked client snap on every snapshot.
+  ARENA_RADIUS: 7.0,
+  PLAYER_RADIUS: 0.4,
+  MAX_POSITION_RADIUS: 6.6, // ARENA_RADIUS - PLAYER_RADIUS
+  PLAYER_COLLISION: false,
+  SPAWN_RING_RADIUS: 4.2, // ARENA_RADIUS * 0.6
+
+  MAX_INPUT_PER_SEC: 30,
+
+  // Escrow — testnet only, no real value.
+  CHAIN_ID: 10143,
+  FUNDING_WINDOW_SEC: 600,
+  RESOLUTION_WINDOW_SEC: 1200,
 } as const;
 
-export const PROTOCOL_VERSION = '0.3';
-export const RULE_VERSION = 'bomb-rush-v0.3'; // ERD.md: stored on matches
-export const CHAIN_ID = 10_143; // Monad Testnet — P0 only, no mainnet
+/** Nominal gameplay per seat count. Excludes lobby, transitions and result. */
+export const MATCH_DURATION_MS = {
+  3: GAME_RULES.BOMB_CYCLE_MS * 2, // 20_000
+  4: GAME_RULES.BOMB_CYCLE_MS * 3, // 30_000
+} as const;
+
+/** Entry bounds enforced by the deployed contract; read `entryBounds()` to confirm. */
+export const ENTRY_MIN_WEI = 1_000_000_000_000_000n; // 0.001 test MON
+export const ENTRY_MAX_WEI = 10_000_000_000_000_000n; // 0.01 test MON
+export const ENTRY_DEFAULT_WEI = ENTRY_MIN_WEI;
+export const ENTRY_PRESETS_MON = ['0.001', '0.005', '0.01'] as const;
+
+export const PROTOCOL_VERSION = '0.5';
+export const RULE_VERSION = 'bomb-rush-v0.5'; // ERD.md: stored on matches
+export const CHAIN_ID = GAME_RULES.CHAIN_ID; // Monad Testnet — P0 only, no mainnet
 
 // ---------------------------------------------------------------------------
 // Room status — SYS.md state machine, trimmed to P0: FUNDING / REFUND_* /
