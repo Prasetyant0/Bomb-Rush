@@ -9,7 +9,7 @@ import { createArena, createThirdPersonCamera } from "../assets/ArenaScene.js";
 import { createAvatar, HATS, createTargetRing } from "../assets/PlayerAvatar3D.js";
 import { createBomb } from "../assets/BombModel.js";
 import { PALETTE, PLAYER_PALETTES } from "../assets/style.js";
-import { makeRoom, addPlayer, startRound, step, pass, input, PASS_RANGE } from "./sim.js";
+import { makeRoom, addPlayer, startRound, step, pass, input, driveBots, PASS_RANGE } from "./sim.js";
 import { SFX } from "./sfx.js";
 
 const DT = 1 / 20; // 20 Hz local authority tick (SYS.md §5)
@@ -295,19 +295,7 @@ export function bootMatch(host) {
     input(me, x, z, keys.ShiftLeft || keys.ShiftRight);
     if (me.stamina <= 0) me.wantsSprint = false; // RUN toggle off at 0 (GC §4 / design.md §5)
 
-    // demo bots: chase the holder, occasionally pass — same sim rules as humans
-    const holder = session.r.players[session.r.holderSeat];
-    session.r.players.forEach((bot, i) => {
-      if (i === 0 || !bot.alive) return;
-      if (holder?.alive && holder.seat !== bot.seat) {
-        const dx = holder.pos.x - bot.pos.x, dz = holder.pos.z - bot.pos.z, L = Math.hypot(dx, dz);
-        if (L > 0.7) {
-          const drift = Math.sin(session.r.clock * 1.7 + i * 2.4) * 0.4; // slight weave, no cloning
-          input(bot, dx / L + drift, dz / L - drift, Math.random() < 0.02);
-        } else input(bot, 0, 0, false);
-      } else input(bot, 0, 0, false);
-      if (bot.alive && session.r.holderSeat === bot.seat && Math.random() < 0.008) pass(session.r, bot.seat);
-    });
+    driveBots(session.r, 0); // demo bots, shared with the lobby preview
   }
 
   // ---- still / exhibition animations for spectate/round transitions ----
