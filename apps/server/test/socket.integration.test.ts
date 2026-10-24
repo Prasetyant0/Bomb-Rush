@@ -42,7 +42,7 @@ afterAll(async () => {
 describe('socket.io crossplay integration', () => {
   it('create → join → subscribe → ready → countdown → LIVE → pass accepted', async () => {
     // 4 = 3 humans (REST join via clients' REST is not used here; host + 3 joins)
-    const createRes = await srv.app.inject({ method: 'POST', url: '/api/rooms', payload: { visibility: 'PUBLIC', virtualDemoEntryWei: '1000000000000000000', allowDemoBot: false } });
+    const createRes = await srv.app.inject({ method: 'POST', url: '/api/rooms', payload: { visibility: 'PUBLIC', virtualDemoEntryWei: '1000000000000000', allowDemoBot: false } });
     expect(createRes.statusCode).toBe(201);
     const { roomId, participantId: hostId, sessionToken: hostToken } = createRes.json();
 
@@ -135,7 +135,7 @@ describe('socket.io crossplay integration', () => {
   }, 30_000);
 
   it('invalid payload rejected; snapshot 20 Hz loop emits match:snapshot', async () => {
-    const createRes = await srv.app.inject({ method: 'POST', url: '/api/rooms', payload: { visibility: 'PUBLIC', virtualDemoEntryWei: '1000000000000000000', allowDemoBot: false } });
+    const createRes = await srv.app.inject({ method: 'POST', url: '/api/rooms', payload: { visibility: 'PUBLIC', virtualDemoEntryWei: '1000000000000000', allowDemoBot: false } });
     const { roomId, participantId, sessionToken } = createRes.json();
     // two extra humans
     const j1 = await srv.app.inject({ method: 'POST', url: `/api/rooms/${roomId}/join`, payload: { kind: 'HUMAN' } });

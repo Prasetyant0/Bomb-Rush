@@ -211,6 +211,23 @@ export function createEscrow({ wallet, escrowAddress, chainId = MONAD_CHAIN_ID }
       return { maxFundingWindowSec: funding, maxResolutionWindowSec: resolution };
     },
 
+    /**
+     * The chain's own clock, in seconds.
+     *
+     * Deadlines must be computed from `block.timestamp`, not `Date.now()`.
+     * The two are close on a live network but drift on a local dev chain whose
+     * block time was moved, and the contract compares deadlines against
+     * `block.timestamp` only. Using the browser clock produced a deadline that
+     * was already in the past by the time the tx was mined, which the contract
+     * correctly rejected as BadDeadlines — a failure that looks like a contract
+     * bug and is actually a clock-source bug in the client.
+     */
+    async readChainTimeSec() {
+      const block = await request("eth_getBlockByNumber", ["latest", false]);
+      if (!block?.timestamp) throw new Error("CHAIN_TIME_UNREADABLE");
+      return BigInt(parseInt(block.timestamp, 16));
+    },
+
     /** getRoom(roomKey) → decoded Room struct. */
     readRoom(roomKey) {
       return decodeRoom(ethCall(encodeGetRoom(roomKey)));

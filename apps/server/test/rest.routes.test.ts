@@ -26,7 +26,7 @@ describe('REST contracts (API_CONTRACT §2)', () => {
     expect(bad1.statusCode).toBe(400);
     const bad2 = await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '99999999999999999999999999' } });
     expect(bad2.statusCode).toBe(400);
-    const good = await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000000', allowDemoBot: false } });
+    const good = await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000', allowDemoBot: false } });
     expect(good.statusCode).toBe(201);
     const j = good.json();
     expect(j.participantId).toBeTruthy();
@@ -35,8 +35,8 @@ describe('REST contracts (API_CONTRACT §2)', () => {
   });
 
   it('private rooms excluded from public list', async () => {
-    const pub = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000000', visibility: 'PUBLIC' } })).json();
-    const priv = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000000', visibility: 'PRIVATE' } })).json();
+    const pub = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000', visibility: 'PUBLIC' } })).json();
+    const priv = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000', visibility: 'PRIVATE' } })).json();
     const listed = (await app.inject({ method: 'GET', url: '/api/rooms' })).json().rooms as any[];
     const pubIds = listed.map((r) => r.roomId);
     expect(pubIds).toContain(pub.roomId);
@@ -44,7 +44,7 @@ describe('REST contracts (API_CONTRACT §2)', () => {
   });
 
   it('join returns token; unknown room 404/409; full room 403', async () => {
-    const c = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000000' } })).json();
+    const c = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000' } })).json();
     for (let i = 0; i < 3; i++) {
       const r = await app.inject({ method: 'POST', url: `/api/rooms/${c.roomId}/join`, payload: { kind: 'HUMAN' } });
       expect(r.statusCode).toBe(200);
@@ -62,7 +62,7 @@ describe('REST contracts (API_CONTRACT §2)', () => {
   });
 
   it('cancel: only host participant id works; stranger gets 403', async () => {
-    const c = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000000' } })).json();
+    const c = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000' } })).json();
     // host participantId is the one returned at create
     const j = (await app.inject({ method: 'POST', url: `/api/rooms/${c.roomId}/join`, payload: {} })).json();
     const stranger = await app.inject({ method: 'POST', url: `/api/rooms/${c.roomId}/cancel`, payload: { participantId: j.participantId, sessionToken: j.sessionToken } });
@@ -82,7 +82,7 @@ describe('REST contracts (API_CONTRACT §2)', () => {
     const r = await app.inject({ method: 'GET', url: '/api/matches/nope/result' });
     expect(r.statusCode).toBe(404);
     // finished match path exercised in socket integration; here verify schema shape
-    const c = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000000' } })).json();
+    const c = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000' } })).json();
     // no match yet: 404 — result only for FINISHED
     const nj = await app.inject({ method: 'GET', url: `/api/matches/${c.roomId}/result` });
     expect(nj.statusCode).toBe(404);
