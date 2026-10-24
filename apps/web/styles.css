@@ -168,7 +168,7 @@ body.playing main { max-width: none; padding: 0; }
 .hright { display: flex; gap: 8px; align-items: center; }
 .pill { font-size: 9px; font-weight: 800; color: #b5abc8; letter-spacing: .6px; margin-right: 8px; }
 .iconbtn { width: 34px; height: 34px; border: 1px solid #6e547b; background: #221a2ccc; color: #e3d6f9; font-size: 15px; }
-.hud.round { top: 92px; left: 50%; transform: translateX(-50%); white-space: nowrap; display: flex; gap: 9px; align-items: center;
+.hud.round { top: 136px; left: 50%; transform: translateX(-50%); white-space: nowrap; display: flex; gap: 9px; align-items: center;
   background: #181423dd; border: 1px solid #4a3e5d; padding: 9px 14px; font-size: 9px; letter-spacing: 1px; font-weight: 800; z-index: 4; }
 .hud.round b { width: 1px; height: 11px; background: #534666; }
 .hot { color: var(--ws); }
