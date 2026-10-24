@@ -1,4 +1,4 @@
-// BOMB RUSH sim — authoritative gameplay engine (bomb-rush-docs/GAMEPLAY_CONTROLS.md).
+// BOMB RUSH sim — authoritative gameplay engine (docs/spec/GAMEPLAY_CONTROLS.md).
 // Framework-free, zero three.js: runs unchanged in Node for the QA vectors (GS-01..07)
 // in sim.test.js, and is the exact module a 20 Hz server would import (SYS.md §5).
 // The client predicts locally with step() and corrects against server snapshots later.

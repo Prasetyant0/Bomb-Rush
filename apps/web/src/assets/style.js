@@ -1,5 +1,5 @@
 // Shared palette + toy material factory for all BOMB RUSH 3D assets.
-// Colors come from bomb-rush-docs/design.md §1.
+// Colors come from docs/spec/design.md §1.
 import * as THREE from "three";
 
 export const PALETTE = {

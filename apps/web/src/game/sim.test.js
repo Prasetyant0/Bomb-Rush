@@ -1,5 +1,5 @@
-// BOMB RUSH QA vectors (bomb-rush-docs/GAMEPLAY_CONTROLS.md §8) —
-// run with: node src/game/sim.test.js   (no frameworks, one file)
+// BOMB RUSH QA vectors (docs/spec/GAMEPLAY_CONTROLS.md §8) —
+// run with: node apps/web/src/game/sim.test.js   (no frameworks, one file)
 import {
   makeRoom, addPlayer, startRound, step, pass, input, clampArena,
   STAMINA_MAX, SPRINT_REENABLE, WALK_SPEED, SPRINT_SPEED,

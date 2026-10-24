@@ -18,3 +18,7 @@ contracts/.env
 .playwright-mcp/
 *.log
 .DS_Store
+
+# macOS archive junk carried in with the design reference kit.
+reference/**/__MACOSX/
+reference/**/._*
