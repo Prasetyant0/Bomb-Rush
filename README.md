@@ -6,6 +6,8 @@ BOMB RUSH 3D is a browser-based multiplayer survival game where 3–4 players co
 
 **Play now:** https://bombrush.my.id/
 
+![Teks Alternatif](docs/images/bombrush3d.png)
+
 No game installation required. Open the website, gather your friends, and enter the arena.
 
 ## How to Play
@@ -198,3 +200,5 @@ BOMB RUSH 3D is designed for gameplay and testing on Monad Testnet. Testnet asse
 **Monad Blitz Jogja Vol. 2**
 
 BOMB RUSH 3D — One bomb, a few players, and no room for hesitation.
+
+Linkedin Post: https://lnkd.in/p/gY6q26MP
