@@ -54,7 +54,7 @@ async function main() {
   step('1. health + create room');
   const health = await api('GET', '/health');
   expect(health.status === 200 && health.json.ok === true, 'GET /health ok');
-  const host = await api('POST', '/api/rooms', { visibility: 'PUBLIC', virtualDemoEntryWei: '1000000000000000000', allowDemoBot: false });
+  const host = await api('POST', '/api/rooms', { visibility: 'PUBLIC', virtualDemoEntryWei: '1000000000000000', allowDemoBot: false });
   expect(host.status === 201 && !!host.json.sessionToken && !!host.json.participantId, 'POST /api/rooms → tokens minted');
   const { roomId, participantId: hostId, sessionToken: hostToken } = host.json;
 

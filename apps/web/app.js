@@ -773,15 +773,17 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
     else if (!addr) err.textContent = "Hubungkan wallet untuk membuat room berdana.";
     else if (!chainOk) err.textContent = `Wallet di chain ${w.chainId ?? "?"} — pindah ke 10143 dulu.`;
     else if (!boundsOk) err.textContent = "Nominal di luar batas kontrak.";
-    else if (!serverOk) err.textContent = "Server hanya menerima 0.01 MON untuk room berdana saat ini (batas demo-credit 1e16 wei).";
+    else if (serverOk === false) err.textContent = "Nominal di luar batas server.";
     else err.textContent = "";
   }
 
-  // The server's demo-credit field is 1e16..1e19 wei AND must equal the chain
-  // entryWei (store.ts), while the contract's window is 1e15..1e16. The overlap
-  // is exactly 0.01 MON, so that is the only entry a FUNDED room can use today.
-  // Stated in the UI rather than discovered as a server error at demo time.
-  const SERVER_MIN_ENTRY_WEI = 10n ** 16n;
+  // The server used to accept only 1e16..1e19 while the contract accepts
+  // 1e15..1e16, so 0.01 MON was the single value that satisfied both and every
+  // other preset left the create button disabled. The server now mirrors the
+  // contract's window, so the only gate that matters is the one read from
+  // `entryBounds()`. This constant is kept as a floor for the legacy
+  // demo-credit field and must stay <= the contract minimum.
+  const SERVER_MIN_ENTRY_WEI = 10n ** 15n;
 
   async function createFundedRoom() {
     if (state.creating) return;
@@ -806,22 +808,22 @@ import { createEscrow, escrowAddressFromEnv, explorerTxUrl, settlementState, sho
       //    built here, not derived by the server afterwards.
       const { roomKey } = esc.makeRoomKey(addr);
 
-      // 2. Deadlines in UNIX SECONDS (contract uint64), computed browser-side.
-      //    The contract caps each window at creation time, so the value sent is
-      //    min(intended window, cap - 60s). With the deployed caps that is
-      //    540 / 1140, NOT the 600 / 1200 named in the spec — the spec's numbers
-      //    are the caps, and the 60s slack exists because block.timestamp runs
-      //    ahead of the browser clock and the contract rejects a deadline past
-      //    `nowTs + cap`.
+      // 2. Deadlines in UNIX SECONDS (contract uint64), anchored to the CHAIN's
+      //    clock. The contract compares against `block.timestamp`, so computing
+      //    from Date.now() is only correct while the two agree. On a local dev
+      //    chain whose time has been moved they do not, and the deadline is
+      //    already stale when the tx mines — the contract rejects it with
+      //    BadDeadlines, which reads as a contract bug but is a clock bug here.
+      //
+      //    The gap between funding and resolution must also stay under
+      //    (maxResolution - maxFunding), or `resolutionDeadline > now + cap`
+      //    trips even when each deadline looks individually small.
       const windows = await esc.readWindows();
-      const nowSec = BigInt(Math.floor(Date.now() / 1000));
-      // Leave a minute of slack under each contract cap: block.timestamp is
-      // always ahead of the browser clock, and the contract rejects a deadline
-      // beyond `nowTs + cap`.
+      const nowSec = await esc.readChainTimeSec();
       const fundingCap = windows.maxFundingWindowSec > 60n ? windows.maxFundingWindowSec - 60n : windows.maxFundingWindowSec;
       const resolutionCap = windows.maxResolutionWindowSec > 60n ? windows.maxResolutionWindowSec - 60n : windows.maxResolutionWindowSec;
-      const fundingDeadline = nowSec + (540n < fundingCap ? 540n : fundingCap);
-      let resolutionDeadline = nowSec + (1140n < resolutionCap ? 1140n : resolutionCap);
+      const fundingDeadline = nowSec + (300n < fundingCap ? 300n : fundingCap);
+      let resolutionDeadline = nowSec + (840n < resolutionCap ? 840n : resolutionCap);
       if (resolutionDeadline <= fundingDeadline) resolutionDeadline = fundingDeadline + 60n;
 
       // 3. createRoom + the host's own deposit, one transaction. The provider

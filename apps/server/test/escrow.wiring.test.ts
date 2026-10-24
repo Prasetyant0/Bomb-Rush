@@ -43,7 +43,7 @@ function fakeGateway(opts: {
       reads.push(roomKey);
       return opts.readRoom
         ? opts.readRoom(roomKey)
-        : { status: 'FUNDING' as const, entryWei: 10n ** 18n, host: HOST.toLowerCase() };
+        : { status: 'FUNDING' as const, entryWei: 10n ** 15n, host: HOST.toLowerCase() };
     },
     async entryBounds() {
       return opts.bounds ?? { minWei: 10n ** 15n, maxWei: 10n ** 19n };
@@ -107,7 +107,7 @@ describe('roomKey derivation', () => {
 describe('room creation and wallet seats', () => {
   it('demo room (no host wallet, no roomKey) has roomKey null', async () => {
     const store = makeStore();
-    const r = await store.createRoom('h', '1000000000000000000', false);
+    const r = await store.createRoom('h', '1000000000000000', false);
     expect(store.getRoom(r.roomId!)!.roomKey).toBeNull();
     expect(store.roomState(r.roomId!)!.roomKey).toBeNull();
     store.stop();
@@ -115,7 +115,7 @@ describe('room creation and wallet seats', () => {
 
   it('accepts a client-supplied roomKey and stores it verbatim (lowercase)', async () => {
     const store = makeStore({ escrowGateway: fakeGateway() });
-    const r = await store.createRoom('h', '1000000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
+    const r = await store.createRoom('h', '1000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
     expect(r.errors).toEqual([]);
     const room = store.getRoom(r.roomId!)!;
     expect(room.roomKey).toBe(CLIENT_KEY);
@@ -128,7 +128,7 @@ describe('room creation and wallet seats', () => {
 
   it('chain-disabled room stores the key as UNVERIFIED (escrowStatus NONE)', async () => {
     const store = makeStore({ escrowGateway: null });
-    const r = await store.createRoom('h', '1000000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
+    const r = await store.createRoom('h', '1000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
     expect(r.errors).toEqual([]);
     const room = store.getRoom(r.roomId!)!;
     expect(room.roomKey).toBe(CLIENT_KEY);
@@ -138,10 +138,10 @@ describe('room creation and wallet seats', () => {
 
   it('rejects a roomKey whose on-chain host is a different wallet', async () => {
     const gateway = fakeGateway({
-      readRoom: async () => ({ status: 'FUNDING' as const, entryWei: 10n ** 18n, host: P2.toLowerCase() }),
+      readRoom: async () => ({ status: 'FUNDING' as const, entryWei: 10n ** 15n, host: P2.toLowerCase() }),
     });
     const store = makeStore({ escrowGateway: gateway });
-    const r = await store.createRoom('h', '1000000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
+    const r = await store.createRoom('h', '1000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
     expect(r.errors[0].code).toBe('BAD_PAYLOAD');
     expect(r.errors[0].message).toContain('host');
     expect(r.roomId).toBeUndefined();
@@ -153,16 +153,16 @@ describe('room creation and wallet seats', () => {
       readRoom: async () => ({ status: 'NONE' as const, entryWei: 0n, host: '0x0000000000000000000000000000000000000000' }),
     });
     const store = makeStore({ escrowGateway: gateway });
-    const r = await store.createRoom('h', '1000000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
+    const r = await store.createRoom('h', '1000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
     expect(r.errors[0].message).toContain('does not exist');
     store.stop();
   });
 
   it('rejects a roomKey already bound to a different server room', async () => {
     const store = makeStore({ escrowGateway: fakeGateway() });
-    const first = await store.createRoom('h', '1000000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
+    const first = await store.createRoom('h', '1000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
     expect(first.errors).toEqual([]);
-    const second = await store.createRoom('h2', '1000000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
+    const second = await store.createRoom('h2', '1000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
     expect(second.errors[0].code).toBe('BAD_PAYLOAD');
     expect(second.errors[0].message).toContain('already bound');
     expect(second.roomId).toBeUndefined();
@@ -174,7 +174,7 @@ describe('room creation and wallet seats', () => {
       readRoom: async () => ({ status: 'FUNDING' as const, entryWei: 5n * 10n ** 15n, host: HOST.toLowerCase() }),
     });
     const store = makeStore({ escrowGateway: gateway });
-    const r = await store.createRoom('h', '1000000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
+    const r = await store.createRoom('h', '1000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
     expect(r.errors[0].code).toBe('BAD_PAYLOAD');
     expect(r.errors[0].message).toContain('Entry');
     store.stop();
@@ -182,10 +182,10 @@ describe('room creation and wallet seats', () => {
 
   it('rejects a roomKey without a host wallet, and an unverified key is never marked FUNDED', async () => {
     const store = makeStore({ escrowGateway: fakeGateway() });
-    const noWallet = await store.createRoom('h', '1000000000000000000', false, 'PUBLIC', null, CLIENT_KEY);
+    const noWallet = await store.createRoom('h', '1000000000000000', false, 'PUBLIC', null, CLIENT_KEY);
     expect(noWallet.errors[0].code).toBe('BAD_PAYLOAD');
 
-    const ok = await store.createRoom('h', '1000000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
+    const ok = await store.createRoom('h', '1000000000000000', false, 'PUBLIC', HOST, CLIENT_KEY);
     // Verified against a FUNDING room: mirror the chain, do not invent FUNDED.
     expect(store.getRoom(ok.roomId!)!.escrowStatus).toBe('FUNDING');
     store.stop();
@@ -193,7 +193,7 @@ describe('room creation and wallet seats', () => {
 
   it('rejects a duplicate wallet in the same room', async () => {
     const store = makeStore();
-    const r = await store.createRoom('h', '1000000000000000000', false, 'PUBLIC', HOST);
+    const r = await store.createRoom('h', '1000000000000000', false, 'PUBLIC', HOST);
     const first = store.joinRoom(r.roomId!, 'HUMAN', P1);
     expect(first.errors).toEqual([]);
     const dupe = store.joinRoom(r.roomId!, 'HUMAN', P1.toUpperCase().replace('0X', '0x'));
@@ -203,7 +203,7 @@ describe('room creation and wallet seats', () => {
 
   it('rejects a malformed wallet rather than seating a guest', async () => {
     const store = makeStore();
-    const r = await store.createRoom('h', '1000000000000000000', false);
+    const r = await store.createRoom('h', '1000000000000000', false);
     const res = store.joinRoom(r.roomId!, 'HUMAN', '0x1234');
     expect(res.errors[0].code).toBe('BAD_PAYLOAD');
     store.stop();
@@ -222,7 +222,7 @@ describe('REST: wallet plumbing and deposit-confirm', () => {
     const { app, store } = await harness(fakeGateway());
     const created = (await app.inject({
       method: 'POST', url: '/api/rooms',
-      payload: { virtualDemoEntryWei: '1000000000000000000', hostWalletAddress: HOST, roomKey: CLIENT_KEY },
+      payload: { virtualDemoEntryWei: '1000000000000000', hostWalletAddress: HOST, roomKey: CLIENT_KEY },
     })).json();
     await app.inject({ method: 'POST', url: `/api/rooms/${created.roomId}/join`, payload: { kind: 'HUMAN', walletAddress: P1 } });
     const room = (await app.inject({ method: 'GET', url: `/api/rooms/${created.roomId}` })).json().room;
@@ -234,7 +234,7 @@ describe('REST: wallet plumbing and deposit-confirm', () => {
 
   it('join rejects an invalid wallet with 400', async () => {
     const { app, store } = await harness(null);
-    const c = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000000' } })).json();
+    const c = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000' } })).json();
     const r = await app.inject({ method: 'POST', url: `/api/rooms/${c.roomId}/join`, payload: { kind: 'HUMAN', walletAddress: '0xdeadbeef' } });
     expect(r.statusCode).toBe(400);
     expect(r.json().error).toBe('BAD_PAYLOAD');
@@ -246,7 +246,7 @@ describe('REST: wallet plumbing and deposit-confirm', () => {
     const { app, store } = await harness(gateway);
     const c = (await app.inject({
       method: 'POST', url: '/api/rooms',
-      payload: { virtualDemoEntryWei: '1000000000000000000', hostWalletAddress: HOST, roomKey: CLIENT_KEY },
+      payload: { virtualDemoEntryWei: '1000000000000000', hostWalletAddress: HOST, roomKey: CLIENT_KEY },
     })).json();
     // The stored key is the CLIENT's key, not a server derivative.
     expect(c.roomKey).toBe(CLIENT_KEY);
@@ -263,7 +263,7 @@ describe('REST: wallet plumbing and deposit-confirm', () => {
     expect(gateway.calls[0]).toEqual({
       roomKey: CLIENT_KEY,
       player: HOST.toLowerCase(),
-      amountWei: 1000000000000000000n,
+      amountWei: 1000000000000000n,
     });
 
     // Replay: no second chain read.
@@ -285,7 +285,7 @@ describe('REST: wallet plumbing and deposit-confirm', () => {
     const { app, store } = await harness(gateway);
     const c = (await app.inject({
       method: 'POST', url: '/api/rooms',
-      payload: { virtualDemoEntryWei: '1000000000000000000', hostWalletAddress: HOST, roomKey: CLIENT_KEY },
+      payload: { virtualDemoEntryWei: '1000000000000000', hostWalletAddress: HOST, roomKey: CLIENT_KEY },
     })).json();
     const res = await app.inject({
       method: 'POST', url: `/api/rooms/${c.roomId}/deposit-confirm`,
@@ -308,7 +308,7 @@ describe('REST: wallet plumbing and deposit-confirm', () => {
     const { app, store } = await harness(gateway);
     const funded = (await app.inject({
       method: 'POST', url: '/api/rooms',
-      payload: { virtualDemoEntryWei: '1000000000000000000', hostWalletAddress: HOST, roomKey: CLIENT_KEY },
+      payload: { virtualDemoEntryWei: '1000000000000000', hostWalletAddress: HOST, roomKey: CLIENT_KEY },
     })).json();
     const stranger = await app.inject({
       method: 'POST', url: `/api/rooms/${funded.roomId}/deposit-confirm`,
@@ -317,7 +317,7 @@ describe('REST: wallet plumbing and deposit-confirm', () => {
     expect(stranger.statusCode).toBe(403);
     expect(gateway.calls).toHaveLength(0);
 
-    const demo = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000000' } })).json();
+    const demo = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000' } })).json();
     const noKey = await app.inject({
       method: 'POST', url: `/api/rooms/${demo.roomId}/deposit-confirm`,
       payload: { txHash: TX, walletAddress: HOST },
@@ -331,7 +331,7 @@ describe('REST: wallet plumbing and deposit-confirm', () => {
     const { app, store } = await harness(null);
     const c = (await app.inject({
       method: 'POST', url: '/api/rooms',
-      payload: { virtualDemoEntryWei: '1000000000000000000', hostWalletAddress: HOST, roomKey: CLIENT_KEY },
+      payload: { virtualDemoEntryWei: '1000000000000000', hostWalletAddress: HOST, roomKey: CLIENT_KEY },
     })).json();
     const res = await app.inject({
       method: 'POST', url: `/api/rooms/${c.roomId}/deposit-confirm`,
@@ -346,7 +346,7 @@ describe('REST: wallet plumbing and deposit-confirm', () => {
 describe('result commitment', () => {
   it('is null without a roomKey, a winner wallet, or a winner', async () => {
     const store = makeStore();
-    const r = await store.createRoom('h', '1000000000000000000', false); // demo: no key
+    const r = await store.createRoom('h', '1000000000000000', false); // demo: no key
     const room = store.getRoom(r.roomId!)!;
     room.matchId = 'm1';
     room.winnerId = room.participants[0].participantId;
@@ -428,7 +428,7 @@ describe('socket: chain settlement is attempted only with a real commitment', ()
   async function runMatch(app: any, store: RoomStore, url: string, funded: boolean) {
     const created = (await app.inject({
       method: 'POST', url: '/api/rooms',
-      payload: { virtualDemoEntryWei: '1000000000000000000', ...(funded ? { hostWalletAddress: HOST, roomKey: CLIENT_KEY } : {}) },
+      payload: { virtualDemoEntryWei: '1000000000000000', ...(funded ? { hostWalletAddress: HOST, roomKey: CLIENT_KEY } : {}) },
     })).json();
     const wallets = funded ? [P1, P2] : [null, null];
     for (const w of wallets) {
@@ -544,7 +544,7 @@ describe('socket: match:finished carries a real resultHash', () => {
     // Funded room: host + 2 joins all carry wallets.
     const created = (await app.inject({
       method: 'POST', url: '/api/rooms',
-      payload: { virtualDemoEntryWei: '1000000000000000000', hostWalletAddress: HOST, roomKey: CLIENT_KEY },
+      payload: { virtualDemoEntryWei: '1000000000000000', hostWalletAddress: HOST, roomKey: CLIENT_KEY },
     })).json();
     const j1 = (await app.inject({ method: 'POST', url: `/api/rooms/${created.roomId}/join`, payload: { walletAddress: P1 } })).json();
     const j2 = (await app.inject({ method: 'POST', url: `/api/rooms/${created.roomId}/join`, payload: { walletAddress: P2 } })).json();
@@ -590,7 +590,7 @@ describe('socket: match:finished carries a real resultHash', () => {
     }));
 
     // Demo room: no wallets → resultHash must be null, never a fake value.
-    const demo = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000000' } })).json();
+    const demo = (await app.inject({ method: 'POST', url: '/api/rooms', payload: { virtualDemoEntryWei: '1000000000000000' } })).json();
     for (let i = 0; i < 2; i++) await app.inject({ method: 'POST', url: `/api/rooms/${demo.roomId}/join`, payload: {} });
     const demoRoom = store.getRoom(demo.roomId)!;
     const demoEvents: any[] = [];

@@ -14,7 +14,7 @@ import { SessionRegistry } from '../src/net/sessions.js';
 import type { RoomStore } from '../src/game/store.js';
 
 function makeLiveRoom(clock: ReturnType<typeof makeClock>, opts: { humans?: number } = {}): { room: RoomSession; ids: string[] } {
-  const room = createRoom(clock, 'r', 'CMD', 'host-pid', 'PUBLIC', '1000000000000000000', false);
+  const room = createRoom(clock, 'r', 'CMD', 'host-pid', 'PUBLIC', '1000000000000000', false);
   // joins create real participants; `humans` counts them (default 3 → 3 ids)
   const ids: string[] = [];
   for (let i = 0; i < (opts.humans ?? 3); i++) {
@@ -245,7 +245,7 @@ describe('movement authority regression', () => {
 describe('room expiry and cleanup', () => {
   it('maybeExpire marks CANCELED and matchId stays null for lobby-only rooms', () => {
     const clock = makeClock();
-    const room = createRoom(clock, 'r', 'EX', 'h', 'PUBLIC', '1000000000000000000', false);
+    const room = createRoom(clock, 'r', 'EX', 'h', 'PUBLIC', '1000000000000000', false);
     clock.advance(GAME_RULES.ROOM_EXPIRY_MS + 1);
     const ev = maybeExpire(room, clock);
     expect((ev as any).roomLapsed?.status).toBe('CANCELED');

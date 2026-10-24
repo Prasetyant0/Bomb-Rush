@@ -2,7 +2,7 @@
 // No public REST route permits setting winner or bypassing event contracts.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { GAME_RULES, RULE_VERSION } from '@bomb-rush/shared';
+import { GAME_RULES, RULE_VERSION, ENTRY_MIN_WEI, ENTRY_MAX_WEI } from '@bomb-rush/shared';
 import type { RoomStore } from '../game/store.js';
 import { normalizeWallet } from '../escrow/roomKey.js';
 
@@ -11,15 +11,27 @@ const walletSchema = z.string().refine((s) => normalizeWallet(s) !== null, 'must
 
 const createRoomSchema = z.object({
   visibility: z.enum(['PUBLIC', 'PRIVATE']).default('PUBLIC'),
-  // virtualDemoEntryWei: virtual points in 18-dec wei string, 0.01–10 test-MON range
+  /**
+   * The stake per seat, in wei, as a decimal string.
+   *
+   * This MUST be the same window the contract enforces — `entryBounds()` on
+   * the deployed escrow returns 1e15..1e16. It used to say 1e16..1e19 (a
+   * leftover from the virtual-credit era), which meant the only value the
+   * frontend could send that satisfied BOTH the contract and this schema was
+   * exactly 0.01 MON. Every other preset was rejected, so the create button
+   * stayed disabled and no funded room could ever be made.
+   *
+   * The contract is the authority; this mirrors it. If they diverge, the
+   * mismatch surfaces as a rejected room rather than a failed deposit, but the
+   * right fix is always to read `entryBounds()` and match it here.
+   */
   virtualDemoEntryWei: z
     .string()
     .regex(/^[0-9]{1,22}$/, 'nonneg integer wei string')
     .refine((s) => {
       const n = BigInt(s);
-      // 0.01 test MON = 1e16 wei, 10 test MON = 1e19 wei (PRD FR-01)
-      return n >= 10n ** 16n && n <= 10n ** 19n;
-    }, 'entry must be 0.01–10 test-MON-denominated virtual points'),
+      return n >= ENTRY_MIN_WEI && n <= ENTRY_MAX_WEI;
+    }, 'entry must be between ENTRY_MIN_WEI and ENTRY_MAX_WEI (0.001–0.01 test MON)'),
   allowDemoBot: z.boolean().default(false),
   /**
    * Host wallet + the escrow roomKey the HOST created on-chain. The roomKey is
