@@ -22,3 +22,8 @@ contracts/.env
 # macOS archive junk carried in with the design reference kit.
 reference/**/__MACOSX/
 reference/**/._*
+
+# Build output
+dist/
+packages/*/dist/
+apps/*/dist/

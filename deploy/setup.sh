@@ -3,7 +3,13 @@
 #
 # Run as root:
 #   scp -r deploy/ ubuntu@HOST:/tmp/bomb-deploy
-#   ssh ubuntu@HOST 'sudo bash /tmp/bomb-deploy/setup.sh'
+#   ssh ubuntu@HOST 'sudo DOMAIN=app.example.com PORT=3100 bash /tmp/bomb-deploy/setup.sh'
+#
+# This script is written for a SHARED host. It never removes or edits another
+# project's nginx site, never binds a port that is already in use, and refuses
+# to continue if the chosen port is taken. Verify `PORT` and `DOMAIN` before
+# running: the default it was first tested against turned out to host a live
+# unrelated service on :3000.
 #
 # What it does:
 #   1. installs Node 20, nginx, certbot
@@ -23,6 +29,7 @@ set -euo pipefail
 
 DOMAIN="${DOMAIN:-}"
 REPO_URL="${REPO_URL:-}"
+PORT="${PORT:-3100}"
 APP_DIR=/opt/bomb-rush
 SERVICE_USER=bomb
 ENV_FILE="$APP_DIR/.env"
@@ -32,6 +39,12 @@ warn() { printf '\033[1;33m    %s\033[0m\n' "$*"; }
 die() { printf '\033[1;31mFAIL %s\033[0m\n' "$*" >&2; exit 1; }
 
 [ "$(id -u)" = "0" ] || die "run as root (sudo bash setup.sh)"
+
+# Refuse to bind a port another service already owns. This host may be shared;
+# taking :3000 from a live unrelated stack is exactly the mistake this guards.
+if ss -tln "sport = :$PORT" 2>/dev/null | grep -q LISTEN; then
+  die "port $PORT is already in use. Choose another with PORT=3101 ... and re-run."
+fi
 
 # ---------------------------------------------------------------- 1. packages
 say "packages"
@@ -48,13 +61,20 @@ node -v; npm -v
 
 # ---------------------------------------------------------------- 2. user
 say "service user"
-id -u "$SERVICE_USER" >/dev/null 2>&1 || useradd -r -m -d /opt/bomb-rush -s /usr/sbin/nologin "$SERVICE_USER"
+# No -m: the account is a service identity, not a login. Giving it a home at
+# APP_DIR would create the directory git clone then refuses to populate.
+id -u "$SERVICE_USER" >/dev/null 2>&1 || useradd -r -s /usr/sbin/nologin "$SERVICE_USER"
 
 # ---------------------------------------------------------------- 3. repo
 say "repository at $APP_DIR"
 if [ -d "$APP_DIR/.git" ]; then
   git -C "$APP_DIR" fetch --all --quiet
   git -C "$APP_DIR" reset --hard origin/dev
+elif [ -d "$APP_DIR" ] && [ -z "$(ls -A "$APP_DIR" 2>/dev/null)" ]; then
+  # Empty leftover directory: git clone into it is fine once we remove it.
+  rmdir "$APP_DIR" 2>/dev/null || true
+  [ -n "$REPO_URL" ] || die "REPO_URL unset and $APP_DIR is empty"
+  git clone --branch dev "$REPO_URL" "$APP_DIR"
 else
   [ -n "$REPO_URL" ] || die "REPO_URL unset and $APP_DIR is not a git checkout"
   git clone --branch dev "$REPO_URL" "$APP_DIR"
@@ -76,9 +96,9 @@ say "environment file"
 if [ ! -f "$ENV_FILE" ]; then
   # Values verified on chain 2026-10-24. Never take these from
   # contracts/broadcast/* — local anvil runs share chainId 10143 and pollute it.
-  cat > "$ENV_FILE" <<'ENVEOF'
+  cat > "$ENV_FILE" <<ENVEOF
 NODE_ENV=production
-PORT=3000
+PORT=${PORT}
 HOST=127.0.0.1
 LOG_LEVEL=info
 
@@ -178,7 +198,7 @@ server {
 
     # REST
     location /api/ {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:${PORT};
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -187,14 +207,14 @@ server {
     }
 
     location = /health {
-        proxy_pass http://127.0.0.1:3000/health;
+        proxy_pass http://127.0.0.1:${PORT}/health;
         proxy_set_header Host \$host;
     }
 
     # Socket.IO — WebSocket upgrade headers are mandatory; without them the
     # client silently falls back to polling and the match desyncs.
     location /socket.io/ {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:${PORT};
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -209,8 +229,11 @@ server {
 NGINXEOF
 
 ln -sf /etc/nginx/sites-available/bomb-rush /etc/nginx/sites-enabled/bomb-rush
-rm -f /etc/nginx/sites-enabled/default
-nginx -t
+# Deliberately NOT removing sites-enabled/default or any other project's site.
+# This host may serve other applications; a setup script has no business
+# deleting someone else's vhost. If a default site shadows this one, that is a
+# human decision, not a deploy step.
+nginx -t || die "nginx config invalid — nothing was reloaded"
 systemctl reload nginx
 
 # ---------------------------------------------------------------- 8. TLS
@@ -228,7 +251,7 @@ fi
 
 # ---------------------------------------------------------------- 9. verify
 say "verification"
-curl -fsS http://127.0.0.1:3000/health | head -c 400; echo
+curl -fsS http://127.0.0.1:${PORT}/health | head -c 400; echo
 curl -fsS -o /dev/null -w 'frontend HTTP %{http_code}\n' "http://127.0.0.1/" || warn "frontend not served"
 
 say "done"
