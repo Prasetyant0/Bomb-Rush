@@ -108,12 +108,15 @@ backend and receipt-verification behaviour).
    brief's "syntax error near unexpected token '('" was not reproducible on this
    tree; the only real error at that stage of the script is the one above.
 
-2. **`run_tx` argument order — a latent, separately-real bug.** `run_tx` takes
-   `<label> <pk> <ok|revert> <to> ...`; some call sites passed
-   `<label> <pk> <to> ok ...`, putting `ok` in the recipient slot. cast rejects
-   that with `error: invalid value 'ok' for '[TO]': invalid string length`.
-   Reproduced directly. Fixed by validating the third argument in `run_tx` and
-   correcting the call sites, so this can never silently send to a wrong address.
+2. **`run_tx` had no argument validation (hardening, not a live defect).** I
+   initially suspected the call sites passed `<label> <pk> <to> ok ...`, but that
+   was wrong: `git show HEAD:scripts/e2e-escrow.sh` confirms every call site was
+   in the documented `<label> <pk> <ok|revert> <to> ...` order. The
+   `invalid value 'ok' for '[TO]'` error I reproduced came from my own ad-hoc
+   probe command, not from this tree. A guard was still added so a future
+   mis-ordered call fails loudly instead of sending to a bogus address; it did
+   not change the harness's behaviour.
+
 3. **ST08 helper is single-use.** `dev-chain.sh` deploys `RejectingDepositor`
    once and records it in `.local-chain.env`; ST08 calls `disarm()`, which is
    permanent. On an idempotent chain reuse the recorded helper no longer rejects
