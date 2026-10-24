@@ -177,10 +177,11 @@ body.playing main { max-width: none; padding: 0; }
 .cue.on { opacity: 1; }
 .cue b { font: 900 clamp(38px, 6vw, 72px)/1 var(--fd); }
 .cue span, .alert span { font-size: 10px; font-weight: 900; letter-spacing: 2px; color: #d8cdf2; }
-.alert { top: 140px; left: 50%; transform: translateX(-50%); white-space: nowrap; color: #ffb298; background: #351b28;
-  border: 1px solid #e37563; padding: 8px 15px; font: 900 15px var(--fd); letter-spacing: .7px; display: none; z-index: 4; }
+.alert { top: 180px; left: 50%; transform: translateX(-50%); white-space: nowrap; color: #ffb298; background: transparent;
+  border: 0; padding: 8px 15px; font: 900 15px var(--fd); letter-spacing: .7px; display: none; z-index: 4;
+  text-shadow: 0 2px 14px #000c; }
 .alert.on { display: block; animation: pulse 1s infinite; }
-@keyframes pulse { 50% { box-shadow: 0 0 26px #ff655a77; } }
+@keyframes pulse { 50% { opacity: .82; } }
 .gtoast { position: absolute; bottom: 118px; left: 50%; transform: translateX(-50%); white-space: nowrap;
   background: #34243b; border: 1px solid #b291c5; padding: 10px 18px; font-size: 12px; font-weight: 800;
   opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 12; }
