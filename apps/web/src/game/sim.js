@@ -206,6 +206,58 @@ export function step(room, dt = 1 / 20) {
   }
 }
 
+// Demo bot intent — same rules as humans (GC §5: no trusted target; pass() picks
+// the nearest eligible player itself). Used by the arena engine for seats 1+ and by
+// the lobby preview for every seat (skipSeat = -1).
+export function driveBots(room, skipSeat = 0) {
+  const holder = room.players[room.holderSeat];
+  for (const bot of room.players) {
+    if (bot.seat === skipSeat || !bot.alive) continue;
+    if (room.holderSeat === bot.seat) {
+      // holder: steer toward the nearest pass target (same eligibility as sim)
+      let best = null, bestD = Infinity;
+      for (const p of room.players) {
+        if (!p.alive || p.seat === bot.seat) continue;
+        if (room.clock - p.lastHeldAt < LOCKBACK) continue; // anti-return window
+        const d = p.pos.sub(bot.pos).len();
+        if (d < bestD) { bestD = d; best = p; }
+      }
+      if (best) {
+        const dx = best.pos.x - bot.pos.x, dz = best.pos.z - bot.pos.z, L = bestD || 1;
+        // sprint mengejar selama target belum masuk jangkauan oper; jalan saat
+        // dekat (hemat stamina), dan burn habis-habisan di ≤3 s (passSprintPanic)
+        const urgent = room.bombTimer <= 3;
+        const sprint = (urgent && bot.stamina > 0.5) || (bestD > PASS_RANGE * 0.8 && bot.stamina > 1);
+        const s = bestD > 0.6 ? 1 : 0.2; // stop shoving once inside pass range
+        input(bot, (dx / L) * s, (dz / L) * s, sprint);
+      }
+      // pass every attempt tick when eligible (cooldown inside pass() handles pacing)
+      pass(room, bot.seat);
+    } else {
+      // runner: flee the holder — away-vector + weave so bots don't fingerprint-clone.
+      // Stamina management (GC §4): sprint hanya saat pemegang benar-benar dekat
+      // (< 5.5u, sprint 7.0 vs kejaran jalan 4.5 → lolos); saat aman jalan saja supaya
+      // regen 1 bar/s jalan lagi — cadangan untuk emergency berikutnya.
+      if (holder?.alive) {
+        const awayX = bot.pos.x - holder.pos.x, awayZ = bot.pos.z - holder.pos.z;
+        const L = Math.hypot(awayX, awayZ) || 1;
+        const danger = L < 5.5; // jarak kritis: kejaran menutup di sini
+        const sprint = danger && bot.stamina > 0.5; // 0.5 = SPRINT_REENABLE floor
+        const weave = Math.sin(room.clock * 2.2 + bot.seat * 2.4) * 0.55;
+        let mx = awayX / L + weave * (awayZ / L), mz = awayZ / L - weave * (awayX / L);
+        // don't run through the arena wall: if near the rim, curve inward
+        const rim = ARENA_RADIUS - 1.4, r = bot.pos.len();
+        if (r > rim) {
+          const inward = (r - rim) / 0.5; // 0 at rim, 1 further out
+          mx -= (bot.pos.x / r) * inward * 1.5;
+          mz -= (bot.pos.z / r) * inward * 1.5;
+        }
+        input(bot, mx, mz, sprint);
+      } else input(bot, 0, 0, false);
+    }
+  }
+}
+
 // pass attempt: intent carries NO target — server picks nearest eligible (GC §5)
 export function pass(room, seat) {
   if (room.over) return { ok: false, err: "over" };
