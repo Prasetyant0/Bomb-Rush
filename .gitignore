@@ -3,7 +3,9 @@ contracts/out/
 contracts/cache/
 contracts/broadcast/
 
-# Forge dependencies — reinstall with `forge install foundry-rs/forge-std --no-git`.
+# Forge dependencies — reinstall with:
+#   forge install foundry-rs/forge-std --no-git
+#   forge install OpenZeppelin/openzeppelin-contracts --no-git
 contracts/lib/
 
 # Never commit a signer key.
