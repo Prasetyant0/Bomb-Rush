@@ -1,0 +1,119 @@
+{
+  "name": "BOMB RUSH 3D Developer Pack",
+  "version": "0.5-testnet-pool-spec",
+  "date": "2026-10-24",
+  "documentation_count": 22,
+  "status": "Specification only, not implemented/audited/deployed",
+  "files": [
+    {
+      "name": "AGENT_HANDOFF.md",
+      "size_bytes": 3544,
+      "sha256": "005ecc5ebb7bdf96e1c7bebac568d41043ff3dc4e958fad6a7e9742a61675e36"
+    },
+    {
+      "name": "API_CONTRACT.md",
+      "size_bytes": 9672,
+      "sha256": "742065b943166c6ce286c92773c4e0d60483c883b5bf623849a580c29ce62157"
+    },
+    {
+      "name": "AUDIT_CHECKLIST.md",
+      "size_bytes": 3926,
+      "sha256": "9f72801dd22f74a12d4309caa2e51232a76b7b251bb1cbb1aa0a3e491e9b9ed4"
+    },
+    {
+      "name": "BRD.md",
+      "size_bytes": 2835,
+      "sha256": "b9567ad3e10434c6157504a75888ce2510421f2aa8ef08e74b963be50beb6598"
+    },
+    {
+      "name": "CHANGELOG.md",
+      "size_bytes": 2381,
+      "sha256": "da88562a97579fd6fac003c2f0d47e399020cc08a066aaa93fc2c07ebc8308d4"
+    },
+    {
+      "name": "DECISIONS.md",
+      "size_bytes": 5604,
+      "sha256": "f94d008418677ef75a3c7dadb38214f13de359e81e29cf2b19222e86bb40b9e6"
+    },
+    {
+      "name": "DEMO_RUNBOOK.md",
+      "size_bytes": 4206,
+      "sha256": "90abe182c446990e5500a777897ea763f172c78ae194d7c5ef5b22e87c4e1e15"
+    },
+    {
+      "name": "ERD.md",
+      "size_bytes": 2059,
+      "sha256": "e92dbff417111c74f2a3a5941198e41cca8fad4c81337ed470c925b572183f5d"
+    },
+    {
+      "name": "ESCROW_SECURITY.md",
+      "size_bytes": 5562,
+      "sha256": "74a1039909e20372442a1c5aa65f527fabc3765d81aca9d91b5935e058b59a4e"
+    },
+    {
+      "name": "FLOWCHART.md",
+      "size_bytes": 3383,
+      "sha256": "5ed76909aa345f5e2fbe9ab44fd1e2e05811b4d7ded2c17f5d664c53f4c1b8fa"
+    },
+    {
+      "name": "GAMEPLAY_CONTROLS.md",
+      "size_bytes": 4371,
+      "sha256": "cb48a63e46e3482d84d4de915e055a3ac66fce40aca78ed70f2350c3817c09b5"
+    },
+    {
+      "name": "IMPLEMENTATION_PLAN.md",
+      "size_bytes": 4172,
+      "sha256": "ee5a63bb51e3559feb3c445cd3db572d9036df9cf8aad652b49cac5c97e2b794"
+    },
+    {
+      "name": "MONAD_PERFORMANCE.md",
+      "size_bytes": 3508,
+      "sha256": "63eda375d53ddfce261a87aa2510966533c77e7f56e56357d600ffe784f13eda"
+    },
+    {
+      "name": "MVP_SCOPE.md",
+      "size_bytes": 4171,
+      "sha256": "3df9dbb92e97e0af16722bd9a935942f13025ae963c11ab7748cdae915f1c644"
+    },
+    {
+      "name": "PITCH_SCRIPT.md",
+      "size_bytes": 4082,
+      "sha256": "7dc0023d5ce45fb7494cea4c41b7b73db0f4609fb814b21e47f9b3887a43b8fd"
+    },
+    {
+      "name": "PRD.md",
+      "size_bytes": 4639,
+      "sha256": "8ef2dff663dba8757b3df14a8c4c35f61b45a90f4e81b8962ce259644ed8843c"
+    },
+    {
+      "name": "QA_CROSSPLAY.md",
+      "size_bytes": 4482,
+      "sha256": "6a850993cae5ca34e9519dfc950abaf7b37bd6c747ecb81a25bdd663cd4111ca"
+    },
+    {
+      "name": "README.md",
+      "size_bytes": 6692,
+      "sha256": "95d33c50f8b34d461ef5d66c36dc6fefb5843e2012371169272c8d7f3a71bc1b"
+    },
+    {
+      "name": "SMART_CONTRACT_SPEC.md",
+      "size_bytes": 7927,
+      "sha256": "761a7759aff59674643f156b8d9d31a70528db5df44f3f069da3ebcf2d23af0d"
+    },
+    {
+      "name": "SYS.md",
+      "size_bytes": 5601,
+      "sha256": "703b7dcbb95f5f7e3f0bb90e45f6f82b6eb0e4f758ed6fde34f1d799e833eb8b"
+    },
+    {
+      "name": "TRD.md",
+      "size_bytes": 5412,
+      "sha256": "9ad6430d9cb0068bb3376fa3edcec2a748416d8fd0f2766de04d343ee195656b"
+    },
+    {
+      "name": "design.md",
+      "size_bytes": 4702,
+      "sha256": "6f7dd3c2bba2e306b0b1a68c4845d008c7ae4bf301c6e843bf73f0838ec4298d"
+    }
+  ]
+}

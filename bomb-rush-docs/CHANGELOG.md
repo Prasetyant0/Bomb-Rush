@@ -1,16 +1,21 @@
-# CHANGELOG
+# CHANGELOG — BOMB RUSH Developer Pack
 
-## v0.3 — 23 October 2026 (Cross-platform sprint revision)
-**Breaking decisions:**
-- Changed **fixed isometric view** to **third-person orbit-follow**. Mouse drag/scroll (desktop), swipe right side (mobile).
-- Replaced **Space dash + five-second cooldown** with **Shift/RUN five-bar stamina sprint**: 1 bar/s consumption, 1.5 s delay, 1 bar/s regeneration, walk 4.5 and sprint 7.0 units/s.
-- Promoted **mobile web gameplay to P0**, not desktop-only/mobile spectator fallback. Responsive portrait menus + landscape arena, left floating joystick, right camera swipe, RUN toggle, PASS button.
-- Unified desktop/mobile controller output; server authoritative normalized movement, sprint and nearest-target bomb PASS. Changed Socket.IO contract accordingly.
-- Added 3 developer + AI agent parallel ownership, QA crossplay matrix, camera/stamina canonical specs, and typed API contract.
-- Clarified virtual room entry is **virtual points** in P0. Real test MON escrow is optional P2; mainnet wagering remains excluded.
+## v0.5 — 24 October 2026, Testnet Pool Architecture Rewrite
+**BREAKING** against v0.4 result-only virtual-credits contract:
 
-**Documents updated:** README, BRD, PRD, SYS, ERD, TRD, FLOWCHART, design, DECISIONS.  
-**Documents added:** GAMEPLAY_CONTROLS, API_CONTRACT, QA_CROSSPLAY, AGENT_HANDOFF, CHANGELOG.
+1. Product: select fixed native **test MON** per player rather than `entryCredits`; 3/4 human-funded seats. Monad Testnet ONLY; no monetary value, no mainnet.
+2. Contract: new purpose-built escrow (`createRoom`, `joinRoom`, `settle`, `payout`, `cancelRoom`, `expireUnfunded`, `expireUnresolved`, `withdrawRefund`). The v0.4 `recordMatch` contract and guest winner zero address are **not** P0-funded interfaces.
+3. API: typed wei string amounts, wallet-authenticated seat, chain receipt validation; `GameStatus` separate from `EscrowStatus` and `SettlementView`.
+4. Safety: permissionless post-deadline expire/refund and independently callable prize payout; contract balance remains recoverable without application server.
+5. UI: wallet network validation, create+fund, deposit status, pool transparency, claimable vs paid, recovery screen.
+6. QA: add contract property/fuzz/abuse/reentrancy and cross-device wallet deep-link tests; full recovery/no-double-payment stop-ship criteria.
+7. Schedule: prior six-hour scope estimate **no longer assumed feasible**. Define gates; never cut refund safety while accepting deposits.
+8. Pitch: fast off-chain gameplay + on-chain testnet pool, measured wallet-to-receipt evidence; no unsupported 10K TPS benchmark or provably fair claim.
+9. New docs: `SMART_CONTRACT_SPEC.md`, `ESCROW_SECURITY.md`, `MONAD_PERFORMANCE.md`, `AUDIT_CHECKLIST.md`.
+10. Game rules carried forward: 3–4, radius7, 10s bomb cycle, no pass timer reset, 20/30s nominal, 15s lobby countdown, stamina/passing/cross-device control rules.
 
-## v0.1 — 23 October 2026
-Original desktop-first 3D hot-potato specification with isometric camera and dash action. Superseded by v0.3.
+### Explicitly not verified
+This document pack has not compiled or tested a Solidity contract or run a real-match test; no actual deployed address, receipt or benchmark results are supplied. The accessible reference set is v0.4; v0.4.1 simulator binaries/results were not provided for file-level comparison. A doc lint pass is not a security audit.
+
+## v0.4 — 23 October 2026 (historic baseline, superseded for economic flow)
+Result-only chain record, no deposit/escrow/refund, virtual demo credits, operator server-authoritative gameplay, mobile P0, short match timing corrected, in-memory sessions. Preserved gameplay rules; replaced economic architecture.

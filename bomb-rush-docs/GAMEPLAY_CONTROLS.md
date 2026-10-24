@@ -1,81 +1,56 @@
-# GAMEPLAY_CONTROLS.md — Canonical Rules & Cross-Platform Input
+# GAMEPLAY_CONTROLS — v0.5 (v0.4 Mechanics Preserved)
 
-**Version:** v0.3. Treat this document as the gameplay contract for client, server, QA and AI agents.
+Pool accounting **never changes** movement, pass, countdown, collision or bomb timing. `API_CONTRACT.md` is the numeric source of truth. Neither device model nor funded amount grants a gameplay advantage.
 
-## 1. Core round
-1. Room accepts 3–4 participants and begins a 15-second countdown when minimum eligible seats are Ready; last joining slot locks when countdown starts.
-2. Server spawns avatars at equidistant points. Bomb holder selected via server seed and announced.
-3. Bomb cycle lasts exactly 10 seconds of authoritative server time. Passing never resets the timer.
-4. Holder at explosion is eliminated. Repeat with survivors until one remains. Server emits a unique winner and records the match.
-5. If an irrecoverable network/state failure occurs, abort with no fabricated winner.
+## Match
+- 3–4 funded human participants, evenly distributed spawn positions on a radius-`4.2u` ring with per-match rotational offset.
+- Room must first be contract FUNDED and all ready. Server-anchored countdown **15 s**; admissions lock at its start.
+- Each bomb cycle **exactly 10 s** of monotonic server clock. Passing bomb **does not reset** countdown. When timer reaches zero holder is eliminated; repeat until single survivor. 3 players: 2 eliminations ≈20 s nominal; 4 players: 3 ≈30 s nominal, excluding transitions.
+- Initial holder chosen by server RNG, visibly announced. If all players disconnect/round becomes unrecoverable, **cancel**; never fabricate a payout winner. The contract can be canceled/refunded according to its state/deadline rules.
 
-## 2. Control mapping
+## World, movement, collision
+- Flat obstacle-free circular arena radius 7; avatar physical radius .4; server clamps coordinates to radial maximum 6.6, sliding along rim; no player-player collision. World-space input vector normalized magnitude ≤1, no diagonal speed boost.
+- Walk speed 4.5u/s; sprint speed 7u/s (provisional crossplay parameters). Server tick 20 Hz, snapshots 15 Hz. Input rate-limited to 30/sec.
+- Third-person orbit-follow camera target at avatar+1.4u; distance 7–11u (default 9); pitch 20–65° above horizon; yaw 360°, client-only. Mouse drag (desktop) / right-side swipe (mobile).
 
-| Intent | Desktop | Mobile landscape | Authoritative behavior |
-|---|---|---|---|
-| Move | WASD | Left floating joystick | normalized world vector, 4.5 units/s walk |
-| Look/orbit | Mouse drag | Swipe right-side free area | local camera yaw and pitch only |
-| Sprint | Hold Shift | RUN toggle | requires stamina; speed 7.0 units/s |
-| Pass bomb | Press E once | Tap PASS button | server selects nearest eligible target ≤1.8 u |
-| Scoreboard | Hold Tab | Tap compact HUD icon | client display only |
-| Zoom | Mouse wheel | optional settings slider | limited 7–11 u distance, no gameplay effect |
-
-## 3. Third-person camera math
-- Follow pivot = avatar world position + target height; distance defaults to ~9 units.
-- Yaw 360°, pitch/elevation 20–65° (not inverted), smooth damping; avoid wall occlusion if time permits.
-- Input direction is first obtained in **camera-relative** 2D space (`right`, `forward`), transformed to world X/Z, normalized to length ≤1, then sent to backend.
-- Camera orbit is client-owned and does not alter server position, collision or stamina rules. Server has authority over motion and pass distance.
-- Reset camera after respawn/match join to known third-person angle; never accidentally invert swipe on mobile.
-
-## 4. Stamina formula (server only)
-
-**Capacity:** `0 ≤ stamina ≤ 5.0` bars; UI can render five segments with partial fill.  
-**Walking:** `4.5 units/sec`; **sprint:** `7.0 units/sec`.  
-**Sprint drain:** `-1.0 bar/sec` while `input.sprint === true && stamina > 0 && moving`.  
-**Recovery delay:** 1.5 seconds after *last active sprint frame*; re-requesting sprint during this interval delays recovery only if actually sprinting.  
-**Regen:** `+1.0 bar/sec` when not sprinting after the recovery delay; clamp to 5.0.  
-**At zero:** force walking, no sprint until stamina has replenished enough to allow it (suggest reenable threshold 0.5 bar to prevent flicker).  
-**Input profile:** no skill-based differences by device.
-
-```ts
-const staminaNext = (s: number, dt: number, actuallySprinting: boolean, canRegen: boolean) =>
-  Math.min(5, Math.max(0, s + (actuallySprinting ? -1 : canRegen ? 1 : 0) * dt));
-```
-
-Use monotonic server clock, limit per-tick `dt` to avoid huge stamina jumps if process stalls, and send authoritative stamina in snapshots. A mobile RUN toggle is cleared locally at 0 stamina or joystick release, and after app visibility loss. **Regeneration is paused during actual sprinting.**
-
-## 5. Passing, latency, and balance
-- `bomb:pass_intent` has no trusted target. Server picks nearest **eligible** alive player within 1.8 u; deterministic tie-break by participant ID.
-- A player may request pass only while holder and live. Require ≥700ms since their last successful pass. Target cannot be the last holder for 1000ms after transfer (anti-return). Do not reset 10s timer on transfer.
-- Reject attempts beyond range or after explosion timestamp. Server sends `bomb:pass_accepted` or `game:error`; visually indicate successful pass only after acceptance.
-- Suggest P0 proximity indicator for nearby passable players. Both PC and mobile get *same auto-target help* to avoid mouse advantage.
-- Avoid adding a hidden holder movement-speed buff before testing; initial speed parity across players is easier to explain and debug.
-
-## 6. Multi-touch requirements
-- Maintain an independent registry of active Pointer Events (`pointerId`). Assign one joystick pointer, one camera pointer and allow separate RUN/PASS button pointers.
-- A release/cancel of one pointer must not remove another pointer's movement state.
-- Gameplay touch overlays use `touch-action: none`; outside gameplay allow ordinary page scrolling. Use pointer capture carefully, release on `pointerup`, `pointercancel`, `blur`, `visibilitychange`.
-- Avoid large dead zones. Recommend ≥56px touch controls; PASS ≥64px and joystick touch region ≥70px; respect `env(safe-area-inset-*)`.
-
-## 7. UI / feedback
-- Five segment stamina display with exact server value; RUN button shows active request and depleted state, not a fictional bonus.
-- Carrier has overhead bomb + red outline + sound effect and HUD timer. Last 3s: faster blinking and alarm (can be P1 polish, timer readability P0).
-- Landscape gameplay; portrait displays rotate overlay without disconnecting. Camera and joystick recover after resize without leaving stale touches.
-- Spectator cannot send move/pass. After elimination show who remains and allow watching the round.
-
-## 8. Gameplay test vectors (unit/integration)
-| Test | Setup | Expected |
+## Controls
+| Action | Desktop | Mobile landscape |
 |---|---|---|
-| GS-01 | Sprint 5s continuously from full | Reach 0 energy, now forced walk |
-| GS-02 | Stop sprint at t=2s, walk 1.4s | No regeneration yet |
-| GS-03 | Stop sprint and walk 2.5s | 1 energy replenished (1.5s delay + 1s regen) |
-| GS-04 | Send vector (1,1) | Server clamps to unit magnitude; no diagonal boost |
-| GS-05 | PASS target 2.5u away | Reject |
-| GS-06 | PASS to player who just passed it to you within 1s | Reject; lockback |
-| GS-07 | PASS by mobile and desktop simultaneously | First valid by deterministic ordering; one holder |
-| GS-08 | Lock Android screen 4s while holding bomb | Server time continues; eventually reconnect/eliminate according to existing rules |
-| GS-09 | Rotate mobile during live round | One session only; buttons reset/rebind; snapshot stays authoritative |
-| GS-10 | Sprint input spams 200 packets/s | Rate limited; stamina drain based on elapsed server time, not packet count |
+| Move | WASD | Left floating joystick |
+| Sprint | Hold Shift | RUN toggle, released on joystick release/zero/focus loss |
+| Pass bomb | E | PASS button |
+| Camera orbit | Drag mouse | Right-side swipe free zone |
+| Board (optional) | Tab | HUD icon |
+| Zoom | Mouse wheel | Settings slider |
 
-## 9. Explicit exclusions
-No physics projectile trajectories, dash skill, desktop-only core features, real-value wagering, or device-based movement boosts in MVP.
+Multitouch: track separate pointer IDs for joystick, camera, RUN and PASS. Releasing one does not cancel the rest. `pointercancel` / `blur` / `visibilitychange` reset active input. Joystick touch ≥70px, RUN≥56px, PASS≥64px; safe-area insets. Gameplay uses `touch-action:none` only inside its controls. Portrait gameplay shows rotate overlay WITHOUT pausing simulation/time.
+
+## Sprint
+- 5 server-computed stamina bars, drain 1.0/s while **moving and sprinting**; recovery starts only 1.5 s after last actual sprint, then +1.0/s while not sprinting. At 0 player forced to walk; resume sprint above 0.5 to prevent flicker.
+- UI never owns stamina or position; interpolate snapshots; send only input intent.
+
+## Passing
+- Only current alive holder may request passing. Server selects nearest alive eligible player in radius ≤1.8u; no target in intent. Stable tie-break by participant ID.
+- Cooldown 700ms after last accepted pass; immediate return to previous holder prohibited for 1000ms. Pass intent must reach server before bombExpiresAtMs. Reject otherwise. Successful animation only after `bomb:pass_accepted`.
+- Passing gives **no speed bonus**. Holder bonus experiments remain out of P0.
+
+## Readability
+Holder has bomb glyph overhead, bright outline, pulse and global countdown; never rely on color alone. Last 3s faster pulse; audio, heavy VFX optional. Eliminated player becomes read-only spectator with remaining count.
+
+## Crossplay vectors
+| ID | Action | Expected |
+|---|---|---|
+| GS-01 | Sprint continuously from 5 bars | Empty after ~5 s |
+| GS-02 | Stop sprint and wait 1.4 s | No regen yet |
+| GS-03 | Stop for 2.5 s | ~1 bar regenerated |
+| GS-04 | Diagonal input `(1,1)` | Normalized magnitude ≤1 |
+| GS-05 | Pass target at 2.5u | `PASS_OUT_OF_RANGE` |
+| GS-06 | Immediate return within 1s | `PASS_RETURN_LOCK` |
+| GS-07 | Concurrent pass requests | At most one holder |
+| GS-08 | Background phone for 4s | Server timer keeps running |
+| GS-09 | Rotate mid-round | Session remains; no timer pause |
+| GS-10 | Spam 200 inputs/s | Rate-limit / cap applied |
+| GS-11 | Cross arena boundary | Position clamped, no stuck state |
+| GS-12 | Stand overlapping opponent | No player collision as specified |
+
+**Important:** escrow-related delays occur before/after live match, never per input, and testnet balances have NO impact on player strength.

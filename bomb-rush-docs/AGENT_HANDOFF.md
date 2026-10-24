@@ -1,60 +1,31 @@
-# AGENT_HANDOFF.md — Three Developers + AI Coding Agents
+# AGENT_HANDOFF — Team and AI Coding Agent Contract v0.5
 
-**Goal:** six-hour hackathon execution with parallel, non-conflicting work and a completed laptop+Android+iPhone crossplay demo.
+## Ownership
+| Owner | Writes | Not allowed to change without agreement |
+|---|---|---|
+| Dev A: Game visual | `apps/web/src/game/**`, `apps/web/src/input/**`, `apps/web/public/models/**` | Core GameRules, escrow ABI, live server values |
+| Dev B: Server authoritative | `apps/server/src/**`, `packages/shared/**` first merge | Contract ABI without C approval; client-only keys |
+| Dev C: Contract + Product | `contracts/**`, `apps/web/src/web3/**`, `apps/web/src/pages/**` | Game input semantics, server-controlled winner |
+| Shared | `apps/web/src/ui/**`, root tooling/docs | Update only coordinated revision |
 
-## 1. Ownership
-| Owner | Primary responsibility | Folder ownership | Mandatory P0 deliverables |
-|---|---|---|---|
-| Dev A — Game/UX | React/R3F 3D scene, third-person follow camera, desktop controls, mobile joystick/buttons, responsive layout, GLB art | `apps/web/src/game`, `apps/web/src/input`, `apps/web/src/ui` | Camera orbit, playable mobile touch, 5-bar stamina HUD, PASS marker |
-| Dev B — Backend/Realtime | Fastify server, Socket.IO room/game lifecycle, movement/stamina, proximity pass, network authority, reconnect, bot stub | `apps/server/src`, game simulation test suite | 3–4 seat authoritative match, no speed exploit, correct elimination |
-| Dev C — Web3/Product/Integration | Landing/Create/Join/Lobby/Results flows, wallet and Monad registry, database, deployment, integration QA | `apps/web/src/pages`, `apps/web/src/web3`, `contracts`, `infra` | Live website, room URL/QR, signed result testnet receipt, deployment |
+## Shared contract / merge rules
+1. Read `DECISIONS`, `MVP_SCOPE`, `SMART_CONTRACT_SPEC`, `ESCROW_SECURITY`, `API_CONTRACT`, then `GAMEPLAY_CONTROLS` before writing code.
+2. First merged commit pins ABI (method signatures/events/enum) and `game-protocol/0.5` types. Tests that check ABI shape run in CI.
+3. Any protocol change must edit source docs, TypeScript shared package, Solidity ABI and tests **together**. No silent new socket event.
+4. A frontend wallet address or tx hash is not proof of deposit. B verifies chain receipt and event, with session-bound wallet auth.
+5. Only B can determine match winner. Only C's contract checks payout eligibility and double-spend. Do not allow Dev A UI to set winner/settlement.
+6. Integrate against fake GAME snapshots early, but mock chain data must be clearly labeled and forbidden on production/demo routes.
+7. If error path uncertain, do not simulate success. Expose explicit `FAILED` state, retry or refund path.
+8. Never commit secret keys, addresses masquerading as real deployments, fabricated tx hashes, or verified fairness claims.
 
-One developer (ideally Dev B as network contract owner) controls **`packages/shared`**. All three review event/type changes before merge.
+## Key state handoff
+`RoomPublicState` owns `gameStatus` and `escrowStatus` separately. `settlement` in `MatchResult` may be PENDING, CLAIMABLE, PAID, FAILED, REFUNDABLE or REFUNDED. No old `entryCredits` fields. All amounts are wei strings.
 
-## 2. Monorepo
-```text
-bomb-rush/
-  apps/web/
-    src/pages/     # Dev C
-    src/game/      # Dev A
-    src/input/     # Dev A
-    src/ui/        # shared via agreed components
-    src/net/       # Dev C consumes shared socket client
-    src/web3/      # Dev C
-  apps/server/src/{api,rooms,simulation,bots,chain}/  # Dev B except chain integration Dev C
-  packages/shared/src/{constants,events,schemas,types}.ts  # owner Dev B
-  contracts/src/MatchRegistry.sol                      # Dev C
-  docs/                                               # source specs
-```
+## Prompts to delegate directly
+**Agent A prompt:** "Implement BOMB RUSH v0.5 third-person browser arena exclusively from GAMEPLAY_CONTROLS and API_CONTRACT. Output mobile safe landscape HUD + WASD/Shift/E + joystick/RUN/PASS. Server snapshots are authoritative. Do not touch money logic or shared protocol."  
+**Agent B prompt:** "Implement typed Fastify/Socket.IO server + wallet proof + verified receipt ingestion from API_CONTRACT and SYS. All funded-room readiness must be derived from contract state; 3–4 humans, exact quorum, authoritative 20Hz sim. No client winner authority. Follow cancellation recovery."  
+**Agent C prompt:** "Implement TestnetPoolEscrow per SMART_CONTRACT_SPEC and ESCROW_SECURITY with full unit/fuzz/reentrancy/deadline tests, then wallet UI and verified payout/refund explorer states. Monad Testnet 10143 ONLY. Do not release fundable contract until tests and peer review pass. Never claim trustless fairness."  
+**Integration QA prompt:** "Audit every active field and invariant across these docs, Solidity ABI, TypeScript shared types, frontend copy and server validation. Fail if retired v0.4 `entryCredits` used as active source, game starts underfunded, payout has no receipt, or refunds require live backend. Provide evidence and gaps."
 
-## 3. Minimum merge rules
-1. **First commit:** pnpm workspace and shared constants/types from `API_CONTRACT.md` + `GAMEPLAY_CONTROLS.md`, pinned versions and linter/build.
-2. Establish handshake and real socket room event names. Never invent per-feature client events in parallel.
-3. Backend emits fake snapshots early so Dev A can animate with canonical payload even before real sim is ready.
-4. UI uses an adapter layer; rendering never mutates game authority. Dev C must not duplicate Ready/countdown logic in REST and Socket.IO.
-5. All AI agents must read README, DECISIONS, GAMEPLAY_CONTROLS and API_CONTRACT **before implementation**. Agents must not overwrite files owned by other roles without a reviewed PR.
-6. Integration/test branch and deploy must be updated continuously, not only in last 30 minutes.
-
-## 4. Suggested six-hour sprint (relative to official start, not a promise)
-| Window | Dev A | Dev B | Dev C | Team gate |
-|---|---|---|---|---|
-| H1 | 3D placeholders, orbit camera, controls shell | Shared protocol + room skeleton | Routes/create/join/QR + contract skeleton | Code builds, three concurrent clients connect |
-| H2 | Character scene, desktop movement, mobile joystick | Authoritative movement + stamina | Room UI + lobby ready/countdown | Live movement on desktop and phone |
-| H3 | Mobile RUN/PASS, HUD, camera swipe | Passing/explosion/elimination, reconnect | Monad result signer + explorer UI | Full 3-player local match |
-| H4 | Load KayKit/Kenney GLBs, optimize scene | Anti-cheat unit tests, bot opt-in if needed | Public backend/frontend deploy, wallet flow | HTTPS crossplay working |
-| H5 | Target highlights, panic FX, low preset | Fix device latency/input races | Chain receipt and room results UI | Android+desktop+iOS E2E successful |
-| H6 | Visual bugfix | Server bugfix | End-to-end QA, pitch demo, backup recording | Three successful matches + one proof tx |
-
-**Scope cut order:** remove elaborate asset effects → advanced spectator camera → shrinking arena → bot implementation → optional testnet deposit escrow. **Do not cut mobile controls, authoritative stamina, basic multiplayer, result record** unless honestly demoing partial product.
-
-## 5. AI agent role prompts (concise)
-- **Game agent:** "Implement third-person orbit-follow with mouse drag + mobile right swipe, camera-relative normalized WASD/joystick movement, Shift hold/RUN toggle, E/PASS; input schema must be packages/shared; ensure multitouch pointerId isolation. Never author server result fields."
-- **Backend agent:** "Implement 20Hz server-authoritative movement and stamina (5 bars, 1/s drain, 1.5s delay, 1/s regen), nearest valid bomb pass, one winner, reconnect; validate socket payloads with shared zod and deterministic clocks."
-- **Web3/UI agent:** "Implement responsive room pages, create/join/Ready/countdown and Monad Testnet signed match result record; display virtual test-denominated points only. Never suggest real payout or treat fake off-chain points as deposits."
-- **QA/reviewer agent:** "Search stale Dash/SPACE/isometric/mobile optional references; test cross-device joystick/right swipe, lack of sprint exploit, idempotent result registry and UI transaction honesty."
-
-## 6. Demo-pitch dependencies
-- Have QR code and guest-play mode reachable without new-wallet onboarding.
-- Keep 3 clients ready (laptop, Android, iPhone), Wi-Fi and hotspot backup.
-- If mobile in-app wallet steals focus, restore socket state and show match authority; avoid connecting wallets during time-critical bomb cycles.
-- During pitch: create/join → ready → 15s countdown → 1 full match → last survivor → testnet transaction link.
+## Merge gates
+G0 protocol locked; G1 escrow safety tested; G2 3 funded seats and synced match; G3 result settles on chain; G4 prize paid/refunds tested; G5 3-device crossplay; G6 backup demo/claim review. Any red gate means do not call product fully complete.

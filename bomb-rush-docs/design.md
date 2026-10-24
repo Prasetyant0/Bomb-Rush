@@ -1,106 +1,53 @@
-# design.md — BOMB RUSH 3D Cross-Platform Visual & Interaction Spec
+# design.md — UI/UX and Art Direction v0.5
 
-**Version:** 0.3, 23 October 2026  
-**Design promise:** A party game that looks exciting in 3 seconds and is playable on a smartphone using two thumbs. Third-person **orbit-follow** is core — fixed isometric is no longer approved.
+## Visual system
+**Brand:** BOMB RUSH — playful futuristic arcade, not a casino-style betting interface. Cartoon bomb mascot as icon (no text necessary); make it legible as favicon at 32 px and hero art separately. User-supplied Monad palette is direction, not claim of official branding approval.
 
-## 1. Art direction and sources
-
-**Style:** toy-like low-poly future sports arena, not a casino aesthetic. Purple Monad-inspired accents, dark violet stage, brightly coded avatars and intense red bomb. Bold readable HUD. All models must be original/properly licensed and unified by materials, palette and lighting.
-
-| Asset | Candidate source | Notes |
+| Token | Hex | Use |
 |---|---|---|
-| Rigged cartoon characters | https://kaylousberg.itch.io/kaykit-adventurers | Pick one cohesive family, use idle/run animation, verify license in downloaded archive |
-| Stage / walls / obstacles | https://kenney.nl/assets | Low-poly modular packs; check each individual asset license |
-| Alternative stage props | https://quaternius.com/ | Optional low-poly art, verify per pack |
-| Bomb | Generate in R3F using spheres, emissive material, sparks | Avoid spending hackathon time modeling complex effects |
-| GLB conversion | https://github.com/pmndrs/gltfjsx | GLB/glTF → reusable React component |
-| Visual editor | https://triplex.dev/ | Optional to inspect lighting and placement; avoid blocking build on setup |
+| `--purple` | `#6E54FF` | Primary CTA, arena rim, accents |
+| `--ink` | `#0E091C` | App canvas/background |
+| `--lavender` | `#DDD7FE` | Secondary labels / highlights |
+| `--pink` | `#FF8EE4` | Sparks/effects |
+| `--orange` | `#FFAE45` | Fuse, warning/high pressure HUD |
+| `--white` | `#FFFFFF` | Primary text |
 
-Palette: background `#111024`, panels `#211A39`, primary `#8367EF`, lavender `#B9A7FF`, danger `#FF667E`, info cyan `#63E8F2`, warning `#F6BD67`, foreground `#F7F6FF`. Type: Inter / Space Grotesk and tabular numbers for timers.
+Accessibility: pass warnings include both icon and text, WCAG contrast check; focus outlines; reduced motion option; 44px+ tap hitbox on menu. Form/transaction copy must distinguish demonstration from economic value.
 
-## 2. Camera and stage
-- **Third-person camera** follows player from behind and above; orbit with mouse drag (desktop) and swipe (right-side mobile touch zone).
-- Default distance ≈ 9 world units (adjust 7–11); horizontal 360° yaw; pitch/elevation clamp ≈ 20–65° above horizon. No upside-down orbit.
-- Damped follow but no slow-input disadvantage. Camera pitch/zoom only changes view, never movement speed or server collision.
-- Stage: one compact flat circular arena with mild raised rim, ≈ 20 world units wide. Keep distant obstacles minimal so mobile camera is readable.
-- Remote players: clear colored outfits and overhead nameplates; current bomb holder: pulsing ring, red outline, overhead bomb glyph and readable global countdown.
-- As timer hits 3 seconds, blink bomb and intensify sound/particle warning. Reduce/restrict camera shake for accessibility.
-- During eliminated/spectator view, follow any live player or cycle between them if time permits; desktop/mobile matches must remain spectatable.
+## Route map
+`/` landing; `/rooms/create` wallet+amount review; `/join` code; `/room/:code` funding and lobby; `/match/:matchId` gameplay; `/results/:matchId` chain/payout state; `/recover?roomKey=...` direct contract refund/claim utility. Any route reload gets state from API and contract read, not only React memory.
 
-## 3. UI routes and content
+## Screen blueprints
+**Landing:** visual mascot, "ONE BOMB. ONE WINNER."; dominant "Play on Testnet" CTA and Join Code secondary; quick how-to (10sec bomb, pass, last survivor); persistent `TESTNET ONLY · NO REAL VALUE` label.
 
-| Route | Desktop | Mobile |
-|---|---|---|
-| `/` | Hero + Play, Create, Rooms, How to Play | Portrait responsive cards; visible Play/Create primary CTA |
-| `/rooms` | Room list/cards, room code/share | Compact single-column; tap-friendly filters |
-| `/rooms/create` | Test entry presets, custom, bot label | Numeric keypad, responsive form, fixed price confirmation |
-| `/room/:code` | 3–4 seats, Ready, QR/link, countdown | Portrait/landscape both work; clear share/copy CTA |
-| `/match/:id` | 3D canvas + PC HUD | **Landscape-first** 3D canvas + joystick/camera/swipe/RUN/PASS overlays |
-| `/results/:id` | Podium and explorer proof | Vertical stacking, no tiny transaction controls |
+**Create room:** two-row 3/4 seat selector; exact entry MON editable text; derived `Estimated pool = entry × seats` (bigint arithmetic); wallet address, chain chip 10143, contract address expandable; warning `Additional gas required`; CTA "Create & deposit [amount] test MON". Never create UI-only funded state before confirmed event.
 
-All real-value-like amounts are displayed as **virtual demo points denominated in test MON**, not as real funds. If P2 genuine testnet deposits are implemented, distinguish verified chain transfer from a virtual total. No fake 'transaction confirmed' state. Operator bot labeled in room listing, lobby, match and results.
+**Join:** 6-char code, room cost and deposit count visible before signing. Button labeled "Deposit [amount] test MON" with wallet prompt step, tx pending spinner, retry. Display deadline countdown separately from gameplay bomb countdown.
 
-## 4. Desktop in-match HUD wireframe
-```text
-+---------------------------------------------------------------------------------+
-| BOMB RUSH          ALIVE 3/4           BOMB 00:07.35        SCORE   SETTINGS      |
-|                                                                                 |
-|                 [ Third-person follow 3D arena ]                                |
-|                Enemy marker    Bomb holder red ring                             |
-|                                                                                 |
-|                 [///// 5 sprint energy bars /////]                              |
-|       WASD MOVE  | DRAG ORBIT  | SHIFT SPRINT  | E PASS   | TAB BOARD            |
-|                           MONAD TESTNET — DEMO                                   |
-+---------------------------------------------------------------------------------+
-```
+**Lobby:** seat cards display wallet short address, `Funded` badge only after verified chain event; not a wallet screenshot claim. Reveal room code + copy, progress `2/4 deposits confirmed`, `TOTAL POOL ... test MON` with explicit `0 platform fee`, Ready disabled before funding. Countdown 15s after quorum/all ready.
 
-## 5. Mobile in-match HUD wireframe (landscape)
-```text
-+--------------------------------------------------------------------------+
-| BOMB RUSH    ALIVE 3/4    BOMB 00:07.35      MENU                         |
-|                                                                          |
-| LEFT THUMB                Third-person arena                RIGHT SWIPE    |
-| [MOVEMENT JOYSTICK]     Players + target indicator        [CAMERA AREA]   |
-|                                                                          |
-|       STAMINA [■][■][■][■][■]          [RUN]      [PASS]                  |
-|                 MONAD TESTNET — DEMO                                     |
-+--------------------------------------------------------------------------+
-```
+**Arena:** low-poly circle radius7 with glowing purple rim; third-person orbit-follow; HUD top: Alive X/Y, Bomb `00:07.35` center, network label; bottom: 5 partial stamina bars, PC hints WASD/SHIFT/E, mobile joystick left and RUN/PASS right. Bomb carrier red/orange ring + overhead glyph. On portrait show rotate overlay, without pausing countdown.
 
-Touch zones:
-- Floating **joystick** bottom left, movement target size ≥70 px; drag with left pointer, clamp displacement, recenter on release.
-- Right half available for **camera swipe**, except separate action button hitboxes. One camera pointer may coexist with joystick and button pointers.
-- **RUN toggle** (≥56×56 CSS px target) shows active state and server-confirmed stamina; turns off at zero or focus loss.
-- **PASS** (≥64×64 CSS px target), disabled/outlined when no valid nearby target; strong highlighted targeting circle when possible.
-- No heavy touch gestures that require pinch/precision to win. Zoom optional via settings slider rather than pinch.
-- Keep HUD away from iOS/Android safe-area insets. Use `touch-action: none` on gameplay touch regions and restore normal scrolling outside match.
+**Result:** Victory/Eliminated state independent of settlement; steps `Result determined → On-chain settlement → Prize claimable → Payout confirmed`. Never jump steps optimistically. Display winner, number of funded seats, exact pool, settle tx, payout tx after receipts. If settlement failed, show retry guidance and the resolution deadline/refund route.
 
-## 6. Orientation and responsive behavior
-- Home, How to Play, Rooms, Create Room, Lobby and Results all support portrait and landscape mobile.
-- When match is portrait: show **Rotate phone to play** overlay. Keep Socket.IO session, sound policy and server countdown alive. Do **not** depend on orientation-lock browser API.
-- Resize WebGL canvas when `visualViewport` / container changes; accommodate browser bars, notch, and safe-area.
-- Handle wallet deep link and return: release touch state, show reconnecting overlay, request authoritative server snapshot; never pause bomb timer for user.
+**Refund/recovery:** show roomKey with copy, actual contract status, wallet deposit membership, reason and eligibility. Buttons `Expire room` when deadline passed; `Withdraw my refund` if room canceled; show already claimed from chain. Usable when gameplay backend is down via direct public RPC.
 
-## 7. Visual performance budget (targets)
-| Setting | Mobile Low | Desktop Default |
-|---|---|---|
-| FPS goal | ≥30 | 60 |
-| DPR | 1–1.5 | 1–2 |
-| Characters | 3–4 models, shared materials | Same |
-| Shadows | Blob shadows or one low shadow map | Low/medium real shadows |
-| Particles | Few particles, no intensive bloom | Limited extra particles/bloom |
-| Assets | Total core game target <10 MB | Same compressed shared assets |
+## Responsive
+- Desktop menu center max width ~1140; cards responsive. Mobile portrait menus and wallet dialogs; arena landscape-first; no explicit orientation locking.
+- Mobile multitouch independent pointer IDs for joystick, camera, RUN, PASS. Respect safe areas `env(safe-area-inset-*)`, dynamic `visualViewport`, and browser bars. All important controls inside gameplay safe zone.
+- Low-end fallback: primitive avatars, one light/no bloom, capped DPR. FPS target desktop 60 mobile 30. Static assets under 10MB.
 
-Use instancing/reused materials, preloading of GLBs, no per-frame React rerenders for dozens of objects. Auto degrade to low preset if FPS drops persistently. Verify on real Android and iOS devices; emulation alone is insufficient.
+## Critical status labels
+| Source | UI text |
+|---|---|
+| tx submitted, no receipt | Waiting for network confirmation… |
+| verified deposit | Deposit confirmed on Monad Testnet |
+| game result, chain pending | Winner determined. Settlement pending. |
+| settled, not paid | Pool allocated. Prize claimable. |
+| payout receipt | Payout confirmed on testnet |
+| canceled | Room canceled. Refund available. |
+| expired but not canceled | Deadline passed. Anyone may expire this room. |
+| RPC down | Could not verify chain status; no confirmation displayed |
 
-## 8. Design acceptance tests
-1. User recognizes current bomb holder on 6-inch landscape device even when player rotates camera.
-2. One joystick finger plus second camera swipe and third tap of PASS can coexist; first movement pointer must not drop.
-3. Stamina state and Sprint active state readable without looking away from game for long.
-4. Joystick/RUN/PASS are not hidden under iOS browser toolbar/safe-area or system gesture edge.
-5. Mobile player can fairly chase/pass a desktop player; auto-target chosen identically by server.
-6. UX labels match actual transaction status and mark virtual points as virtual.
-7. On rotating device, game state remains synchronized (no duplicate player, no match restart).
-
-## 9. Component names
-`ResponsiveShell`, `NetworkBanner`, `WalletButton`, `RoomCard`, `RoomCreateForm`, `BotDisclosure`, `ReadyCountdown`, `ArenaScene`, `ThirdPersonCamera`, `PlayerAvatar3D`, `BombModel`, `BombTargetIndicator`, `StaminaHUD`, `DesktopControlsGuide`, `TouchControlLayer`, `FloatingJoystick`, `RunToggle`, `PassButton`, `RotateDeviceOverlay`, `SpectatorView`, `ResultPodium`, `ChainStatusCard`.
+## Misleading UI to avoid
+No fake `LIVE` chain badges, wallet numbers representing actual credits without chain read, simulated explorer hashes, instant gas-free claims, "secured/trustless fairness" labels, or winner money animation before confirmed payout.

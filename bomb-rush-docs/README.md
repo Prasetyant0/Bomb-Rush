@@ -1,70 +1,72 @@
-# BOMB RUSH 3D — Developer Documentation Pack
+# BOMB RUSH 3D — Developer Pack v0.5
 
-**Version:** `0.3` (cross-platform gameplay baseline)  
-**Updated:** 23 October 2026  
-**Status:** design specification, not an implemented or audited game  
-**Platforms:** desktop Chrome/Edge/Firefox and mobile Android Chrome / iOS Safari browser  
-**Network:** Monad **Testnet** (`chainId: 10143`), test MON/virtual points only — no monetary value.
+**Release:** v0.5-testnet-pool-spec · **Date:** 24 October 2026 · **Status:** implementation specification, NOT an implemented, deployed, audited or tested escrow.  
+**Intent:** cross-device 3D hot-potato multiplayer (3–4 humans), funded with **Monad Testnet MON, no real-world value**; funded match result settles a winner-takes-all pool with an on-chain claim/payout route; canceled/expired matches are refundable.
 
-> **Single source of truth:** This README and `DECISIONS.md` fix v0.3 defaults. `GAMEPLAY_CONTROLS.md` fixes camera/input/stamina rules. `API_CONTRACT.md` fixes the shared network contract. If another document differs, update it before coding; do not silently follow the older rule.
+> **STOP / SCOPE WARNING.** This is a testnet-only hackathon demonstration, not advice that a winner-takes-all wagering product is lawful in Indonesia. Confirm organizer rules; do not advertise mainnet use, real-value prizes, real deposits, returns, or compliance certification. Do not deploy the escrow on mainnet with this pack. No codebase or live contract is included in this archive; security properties below are requirements requiring implementation, review, and tests.
 
-## Scope and compliance
+## What changed from v0.4
 
-The original founder concept includes a creator-selected MON entry amount, pooled player deposits, and a possible operator-funded competing bot. The hackathon specification demonstrates this **only with virtual pool points (P0)**; optional **test MON escrow (P2, not baseline)** requires complete refund/security tests. There is **no real-value stake, real-money payout, or mainnet deployment**. A player-funded real-asset winner-takes-all product may be treated as gambling under Indonesian law; it is outside this pack's implementation scope pending specialist legal review.
+- Replace *virtual demo credits* and result-only `MatchRegistry` with **real testnet-native MON deposits held by a single purpose-built escrow contract**; no redeemability or monetary value.
+- Require a wallet on funding-mode seats. Host creates room + deposits in one wallet transaction; subsequent players join and deposit exact amount.
+- Separate **game status** from **contract funding/settlement state**, use event/receipt reconciliation. Lobby cannot COUNTDOWN until on-chain FUNDED, 3/4 valid funded unique wallets, and everyone ready.
+- Terminal WIN does not equal paid. **Winner has an immutable claimable allocation after settlement**; a backend relayer automatically triggers permissionless `payout()` after verified settlement (with anyone-can-call fallback), and explorer proves transfer only after receipt confirms it.
+- Support cancellation, timed out funding, and expired resolution with **permissionless withdrawRefund**, funded entirely by contract holdings. No money gets stuck only because app server restarted.
+- Keep gameplay/cross-device invariants from v0.4: radius 7; 3–4 humans; 10-second bomb cycles; pass never resets the timer; WASD/Shift/E and mobile landscape joystick/RUN/PASS; 20/30 seconds nominal gameplay.
 
-A maximum of one **explicitly disclosed test-only demo bot** can fill a room, provided at least two humans participate. Operator-controlled competing bots create a conflict of interest and must never be concealed.
+## One-sentence pitch
+"BOMB RUSH is a fast cross-device survival arcade game whose testnet match pool and winner settlement are transparent on Monad, while responsive gameplay remains server-authoritative off-chain."
 
-## Canonical product defaults
+## Hierarchy / single source of truth
+1. **DECISIONS.md** resolves product tradeoffs, security trust assumptions, and scope.
+2. **SMART_CONTRACT_SPEC.md** owns contract states, invariants, entry/funding/refund/claim semantics.
+3. **API_CONTRACT.md** owns constants, application types, HTTP and Socket.IO messages.
+4. **GAMEPLAY_CONTROLS.md** owns controls and gameplay, unchanged by economic architecture.
+5. **MVP_SCOPE.md** determines which requirements must actually ship; remaining docs must not expand it.
+6. Security gate **ESCROW_SECURITY.md** overrides any plan to ship funds handling without recovery/tests.
 
-| Dimension | v0.3 rule |
+If any documents conflict: correct the source of truth **before writing code**. Do not silently implement contradictory assumptions.
+
+## Read order for three devs / AI agents
+`DECISIONS.md` → `MVP_SCOPE.md` → `SMART_CONTRACT_SPEC.md` → `API_CONTRACT.md` → `GAMEPLAY_CONTROLS.md` → `SYS.md` → `AGENT_HANDOFF.md`.
+
+## Contents (21 authored specifications)
+
+| Document | Purpose |
 |---|---|
-| Match | Last-person-standing 3D hot potato, 3–4 seats, 2 humans + 1 visible bot allowed |
-| Session | 60–90 second gameplay target; 15 second server-authoritative lobby countdown |
-| Camera | **Third-person orbit follow**, drag mouse / swipe right-side touch; angle/zoom clamped |
-| Desktop | **WASD** to move, **Shift (hold)** sprint, **E** pass bomb, mouse drag to orbit, Tab leaderboard |
-| Mobile | **Landscape gameplay**, **left floating joystick**, **right swipe** orbit, **RUN toggle**, **PASS tap**; simultaneous 2-touch operation |
-| Sprint | **5 energy bars** (continuous capacity 5.0), spend **1 bar/s**, **1.5 s delay** after stopping, regenerate **1 bar/s** while not sprinting |
-| Speeds | Walk 4.5 world units/s; sprint 7.0 units/s; tune only after playtest |
-| Bomb | 10 s countdown per explosion, unchanged by transfer; closest eligible target within 1.8 world units; 0.7 s pass cooldown; 1 s anti-return to former holder |
-| Balance | Identical rules and server enforcement on PC and mobile; no untested carrier-speed bonus |
-| Arena | One compact low-poly arena; clear warnings at last 3 seconds; shrinking arena is P1, not P0 |
-| Demo entry | Host selects fixed preset `0.1/0.5/1/2` or custom `0.01–10` **virtual test-MON-denominated points**; never depict an actual blockchain deposit unless a tx exists |
-| Chain P0 | Wallet optional to practice; server records final match hash/winner to Monad Testnet, explorer link after confirmation |
-| Server | Node.js + TypeScript + Fastify + Socket.IO; authoritative 20 Hz loop; PostgreSQL + Drizzle for persistence |
-| Team | Three devs: 3D + mobile, realtime backend, Web3 + product/integration; one shared contracts package |
+| `DECISIONS.md` | Locked design choices, explicit exclusions, trust model |
+| `MVP_SCOPE.md` | P0/P1/P2 and go/no-go release conditions |
+| `SMART_CONTRACT_SPEC.md` | Escrow ABI, state machine, safety invariants |
+| `ESCROW_SECURITY.md` | Threat model, misuse tests, fail-safe refund path |
+| `API_CONTRACT.md` | Canonical types, endpoints, socket events, constants |
+| `GAMEPLAY_CONTROLS.md` | Timers, controls, movement, stamina and passing |
+| `SYS.md` | Architecture, state boundaries, event reconciliation |
+| `TRD.md` | Stack, Solidity/Web3 integration, deploy configuration |
+| `PRD.md` | User stories, pages and acceptance requirements |
+| `BRD.md` | Value proposition, audience, risks and evidence |
+| `design.md` | Monad palette, responsive UX, wallet/escrow interaction |
+| `FLOWCHART.md` | Full user journey, settlement, timeout and failure diagrams |
+| `QA_CROSSPLAY.md` | Browser/device and chain state QA release gates |
+| `IMPLEMENTATION_PLAN.md` | 3-person dependency-aware sprint and cut strategy |
+| `AGENT_HANDOFF.md` | Agent ownership and strict integration protocol |
+| `DEMO_RUNBOOK.md` | Exact live demo and honest fallbacks |
+| `PITCH_SCRIPT.md` | Three-minute narrative and expected jury objections |
+| `MONAD_PERFORMANCE.md` | Instrumentation, metrics, safe performance claims |
+| `ERD.md` | Logical persistence reference, chain as funds source of truth |
+| `CHANGELOG.md` | v0.4 → v0.5 breaking changes |
+| `AUDIT_CHECKLIST.md` | Release audit and cross-document checks |
 
-## Document index
+## Known limitations of the hackathon demo
+- The **operator/server remains a trusted winner oracle**. On-chain pool visibility and a result hash do NOT establish trustless gameplay or fairness.
+- The operator key can settle any funded match to an eligible deposited participant unless a stronger proof/permission system is added later.
+- With no database, in-flight game rooms can disappear on process restart. **Contract balances survive**; after timeouts, users can cancel expired contracts and withdraw refunds.
+- `payout()` / `withdrawRefund()` are transactions. Wallet confirmation, RPC inclusion, and indexer times may exceed sub-second protocol finality. Do not promise "instant" payout.
+- The pack is unimplemented. Test results, security audit, benchmark data, contract address, screenshots and tx hashes must be supplied by the actual team, not fabricated.
 
-| Document | What to read it for |
-|---|---|
-| `BRD.md` | Outcomes, audiences, demo criteria, legal and business risks |
-| `PRD.md` | User journeys, functional stories, acceptance checks, priorities |
-| `GAMEPLAY_CONTROLS.md` | **Canonical** third-person camera, joystick, sprint, passing, cross-device balancing |
-| `SYS.md` | Runtime boundaries, room/game state machines, authority and chain flow |
-| `API_CONTRACT.md` | **Canonical** REST routes, typed Socket.IO payloads, sequence and snapshot semantics |
-| `TRD.md` | Implementation choices, packages, repo, security, performance targets |
-| `ERD.md` | Postgres entities, indexes, room/device telemetry and audit rules |
-| `FLOWCHART.md` | Mermaid flows including mobile orientation/reconnect and start countdown |
-| `design.md` | Scene look, asset sources, desktop/mobile wireframes and UI behavior |
-| `QA_CROSSPLAY.md` | Mixed-device test matrix, pass/fail acceptance, fallback plans |
-| `AGENT_HANDOFF.md` | Three-dev + AI agent assignments, sequencing, merge contract, demo plan |
-| `DECISIONS.md` | Frozen decisions, P0/P1/P2 scope, unresolved questions |
-| `CHANGELOG.md` | v0.1 → v0.3 changes |
+## Monad network facts and references
+- **Testnet only:** chain ID `10143`, native symbol `MON`, RPC `https://testnet-rpc.monad.xyz`, faucet `https://faucet.monad.xyz`.
+- Choose and verify explorer URL against a real confirmed tx during preflight; frontends must not generate an unverified explorer link.
+- Official starting points: https://docs.monad.xyz/ ; https://github.com/monad-developers ; https://monad.docsbot.app/ai/current-facts
+- Monad's 10K+ TPS is an architecture/capacity claim; it is NOT a BOMB RUSH measurement. Distinguish chain inclusion/finality from UI → wallet → confirmation end-to-end latency.
 
-## Delivery priority
-
-- **P0 (ship):** cross-platform join/lobby, 3 playable clients, third-person camera, movement, sprint stamina, pass/eliminate/result, server authority, visible Monad testnet record.
-- **P1 (polish):** bot behavior if people unavailable, last-3-second panic effects, spectator controls, camera occlusion, optional shrinking arena, SFX and quality selector.
-- **P2 (stretch):** *real* testnet escrow with verified deposit/refund integration, achievement NFT, tournament system. No real-value bets.
-
-## Helpful asset and tech references
-
-- KayKit Adventurers: https://kaylousberg.itch.io/kaykit-adventurers
-- Kenney asset library: https://kenney.nl/assets
-- React Three Fiber: https://r3f.docs.pmnd.rs/
-- Drei: https://drei.docs.pmnd.rs/
-- gltfjsx: https://github.com/pmndrs/gltfjsx
-- Socket.IO: https://socket.io/docs/v4/
-- Monad documentation: https://docs.monad.xyz/
-
-**Build gate:** Before three AI coding agents begin parallel implementation, merge `packages/shared` event types and get each developer to agree on `API_CONTRACT.md`.
+**Design baseline:** rewritten using accessible v0.4 documents and conversation-level notes of the v0.4.1 simulator audit. Actual v0.4.1 committed files were not provided for file-level diff; the 52/52 audit claim is NOT asserted for this new pack.

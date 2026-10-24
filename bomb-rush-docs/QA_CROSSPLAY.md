@@ -1,57 +1,67 @@
-# QA_CROSSPLAY.md — P0 Device, Gameplay, and Demo Matrix
+# QA_CROSSPLAY — v0.5 Release Matrix
 
-**Minimum real-device set:** Windows/macOS laptop with Chrome/Edge + Android Chrome + iPhone Safari; substitute if unavailable, but mark coverage incomplete. Same match on 3 devices is the strongest demo gate.
+**Test environment:** local EVM (contract safety), Monad Testnet 10143 (integration), real browsers (crossplay). Testnet economic flow needs test funds for gas and exact deposits; never substitute screenshots of receipts.
 
-## A. Cross-platform smoke matrix
-| ID | Scenario | Pass criterion | Priority |
-|---|---|---|---|
-| CP-01 | Desktop, Android, iOS open same HTTPS URL | Canvas loads, UI responsive, controls visible on each | P0 |
-| CP-02 | Mobile menu portrait | Create/join/link/Ready accessible without horizontal scroll | P0 |
-| CP-03 | Mobile match landscape | Joystick, PASS, RUN visible and avoid notches/toolbars | P0 |
-| CP-04 | Two-thumb joystick + right camera swipe | Character moves while camera rotates; no dropped movement | P0 |
-| CP-05 | Joystick + RUN + PASS combined | RUN changes speed; PASS transfers when in range | P0 |
-| CP-06 | Desktop mouse drag + WASD + Shift | Camera follows/orbits, server agrees position and stamina | P0 |
-| CP-07 | Cross-device proximity PASS | All screens agree bomb holder and countdown | P0 |
-| CP-08 | Full match with all three device families | Countdown, pass, elimination, sole winner, explorer proof | P0 |
-| CP-09 | Mobile portrait rotation mid-round | Rotate prompt shown, socket remains joined, rebind controls | P0 |
-| CP-10 | iOS Safari background for 2s | Inputs cleared, reconnection snapshot, authoritative time continues | P0 |
-| CP-11 | Deep-link into wallet app and return | No duplicate room member, correct room state after return | P1 |
-| CP-12 | Android low graphics | Target ≥30FPS in simple scene, no UI blocking | P0 target |
-| CP-13 | Invalid attempt to set winner/stamina/client time | Ignored/rejected server-side | P0 |
-| CP-14 | Two PASS attempts near deadline | Server accepts at most one valid transfer | P0 |
-| CP-15 | Network loss > reconnect grace | Correct elimination or controlled abort with no invented winner | P0 |
+## A. Real device crossplay
+| ID | Scenario | Expected |
+|---|---|---|
+| CP01 | Desktop Chrome + Android Chrome + iPhone Safari same URL | HTTPS/WSS, joins work, no console-critical errors |
+| CP02 | Portrait mobile create/join | No horizontal overflow, correct keyboard/wallet |
+| CP03 | Landscape mobile gameplay | Controls clear of browser safe areas |
+| CP04 | Joystick + camera swipe simultaneously | Both independent |
+| CP05 | Joystick + RUN + PASS simultaneous | Predictable movement and pass |
+| CP06 | Desktop WASD + Shift + drag | Server agrees input and stamina |
+| CP07 | Cross-device bomb pass | All agree one holder and timer |
+| CP08 | 3-player full match | Two 10s bomb cycles, only one winner |
+| CP09 | 4-player full match | Three 10s bomb cycles, only one winner |
+| CP10 | Rotate to portrait mid-game | Overlay shown, server continues ticking |
+| CP11 | iOS wallet deep-link return | Same seat, no double fund or lost session |
+| CP12 | Background 4s then foreground | Release pointers; snapshot recovers |
+| CP13 | Low-end phone | ≥30fps target via fallback; no gameplay advantage |
+| CP14 | Two-player room | Cannot start (must 3), no bot substitution |
+| CP15 | Attempt to send custom winner/position | Backend rejects; contract rejects non-settler |
 
-## B. Stamina tests
-- Full 5 bar sprint → 5 s active sprint at 1 bar/s → 0, forced walk.
-- After sprint end, 1.4 s walking yields no regen; after 2.5 s walking yields approximately +1 bar.
-- Client requests sprint with zero stamina: server reports `isSprinting=false` and speed 4.5.
-- 1,000 packet spam or sprint toggle exploits must not create stamina or exceed speed cap.
-- Diagonal analog joystick vector clamped to ≤1; no speed difference from WASD diagonal movement.
-- Regen must not operate while sprint is actually active; server values are source of truth.
+## B. Funding and receipt verification
+| ID | Scenario | Expected |
+|---|---|---|
+| CH01 | Host creates with exact entryWei | Receipt, RoomCreated and host DepositConfirmed |
+| CH02 | Player joins exact amount | One unique funded seat, contract count advances |
+| CH03 | Wrong value or 0 | Revert, no funded seat |
+| CH04 | Same wallet joins twice | Revert, no double counting |
+| CH05 | Transaction hash from wrong room | Rejected by backend |
+| CH06 | Tx from wrong chain/contract or reverted | Rejected, no funded badge |
+| CH07 | Wallet rejects | No funded status, clear retry |
+| CH08 | One player still pending | Lobby blocks countdown |
+| CH09 | 4-seat room with 3 funded | No countdown or forced 3-player fallback |
+| CH10 | Wallet address spoof in REST | Session signature binding rejects |
+| CH11 | Deadline passed | Join rejected, expire path visible |
+| CH12 | Duplicate log delivery/reconnect | Idempotent funded status |
 
-## C. Room and bot test cases
-- 2 humans cannot start unless host allowed a visible single bot and it joins; 1 human + 1 bot fails start.
-- 3 humans start without bot; 4th human admitted only before countdown.
-- Room expires with no participant fund trapped (P0 has no chain deposits).
-- Label operator bot in room card, lobby, in-game and result; demo bot obeys stamina and pass rules.
-- Cancelled/aborted match must not show fake winner or confirmed chain transaction.
+## C. Settlement/payout/refund invariants
+| ID | Scenario | Expected |
+|---|---|---|
+| ST01 | Only settled after full funded valid match | One eligible winner; MatchSettled |
+| ST02 | Call settle as ordinary wallet | Revert |
+| ST03 | Settle with non-depositor/zero winner | Revert |
+| ST04 | Settle twice | Revert |
+| ST05 | Payout before settlement | Revert |
+| ST06 | Payout twice | Revert / no second transfer |
+| ST07 | Third party triggers payout | Funds still sent to recorded winner |
+| ST08 | Payout recipient rejects transfer | Revert, winner still claimable |
+| ST09 | Cancel before/full funding (authorized) | Refunds available |
+| ST10 | ExpireUnfunded after deadline | Permissionless and refunds |
+| ST11 | ExpireUnresolved after deadline | Permissionless and refunds |
+| ST12 | Same wallet withdrawRefund twice | Second reverts |
+| ST13 | Settle then attempt refund | Reverts |
+| ST14 | Cancel then attempt settle | Reverts |
+| ST15 | Concurrent settle and expire | Exactly one transition wins |
+| ST16 | Kill backend with funded room | Wallet can expire/claim refund after deadline |
+| ST17 | RPC outage during payout | UI never marks paid without chain proof |
+| ST18 | Contract fuzz: balance conservation | Pool never overspent, allocations exact |
 
-## D. On-chain P0 gates
-1. Deploy minimal registry on testnet 10143, make authorized record from server.
-2. Query receipt and `MatchRecorded` event; UI displays PENDING until confirmed.
-3. Repeat same match ID: on-chain duplicate must revert/no-op safely, no extra winner.
-4. Invalid server key or unauthorized caller rejected.
-5. Tested path to explorer URL is real and copyable on mobile.
+## D. Timings / test instrumentation
+Record local `wallet_request_ms`, `tx_submitted_ms`, `tx_receipt_ms`, `ui_verified_ms` and tx hash for create, join, settle, payout, refund. Never interpret provider RPC delay as TPS. Keep network conditions and count; 3 demo transactions are not a throughput benchmark.
 
-## E. Release sequence + backout
-1. E2E on local Wi-Fi / public deployment with WebSocket.
-2. Complete 3 full matches across actual devices. Record fallback screen capture from one completed match **without representing it as live**.
-3. Prepare QR link + manual code, test connection on venue hotspot, and keep bot available in demo-only mode.
-4. If low-end iPhone WebGL underperforms, disable postprocessing/shadows and use primitive fallback avatars; retain gameplay.
-5. If wallet handshake unreliable, allow guest gameplay; perform one signer-recorded match at end and show explorer proof (do not fake wallet authorization).
-6. If 3-player room cannot be stabilized, disclose incomplete status and demo controlled vertical slice, not a misleading prerecorded live match.
-
-## F. UX accessibility tests
-- Toggle sound mute, legible timer and bomb glyph without color-only meaning.
-- Reduced-motion mode for strong camera shake/flash; mobile touch controls large enough to use.
-- Pointercancel and blur clear sticky sprint/joystick states.
+## E. Go/no-go
+**GO FUNDED DEMO** only if ST01–ST18 and CH01–CH12 pass on local tests, all critical happy-path verified testnet, CP01/CP08/CP09 crossplay pass, and safe cancel/refund confirmed. Owner signs off `AUDIT_CHECKLIST.md`.  
+**NO GO:** failed refund, overpayment, possible double-payment, fake confirmation, unverified signer, or missing device controls. Fall back to honest UI-only demo with on-chain funding OFF.

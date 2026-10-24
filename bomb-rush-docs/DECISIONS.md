@@ -1,50 +1,46 @@
-# DECISIONS.md — Frozen Baseline and Remaining Questions
+# DECISIONS — v0.5 Frozen Product and Engineering Decisions
 
-**Version:** v0.3 · 23 October 2026
-
-## Locked v0.3 decisions
-
-| Decision | Status | Canonical value |
+## Product and scope
+| ID | Locked decision | Rationale |
 |---|---|---|
-| Platform | LOCKED | Desktop browser + Android Chrome + iOS Safari mobile web are P0; native app excluded |
-| Mobile UX | LOCKED | Portrait all menus; landscape arena; touch overlays and rotate prompt |
-| Camera | LOCKED | Third-person orbit-follow, desktop mouse drag, mobile right swipe |
-| Movement | LOCKED | WASD / left floating joystick, camera-relative mapped to normalized world vector |
-| Sprint | LOCKED | Shift hold PC; RUN toggle mobile; 5.0 bars; 1 bar/s drain; wait 1.5s then 1 bar/s regen |
-| Speed | PROVISIONAL | Walk 4.5 u/s; sprint 7 u/s; balance in crossplay tests |
-| Bomber speed buff | NOT APPROVED | No bonus by default; consider after testing if chaser too weak |
-| Passing | LOCKED | E/PASS; server-nearest eligible ≤1.8 u; 0.7s pass cooldown, 1s anti-return |
-| Arena | LOCKED | Flat compact one-level arena; shrink effect only P1 |
-| Lobby | LOCKED | 3–4 seats; min 2 humans if visible demo bot; 15s countdown, 10min expiry |
-| Bot | LOCKED | Max 1 opt-in **TEST ONLY** operator demo bot, fully disclosed, same server rules |
-| Room demo pool | LOCKED P0 | Preset/custom **virtual test-MON-denominated points**, no real transfer; label everywhere |
-| Web3 | LOCKED P0 | Monad Testnet result registry and explorer proof; wallet optional for practice |
-| Testnet deposit escrow | P2 | Only if verified deposit/refund path and audit-like regression tests can be completed |
-| Real MON stakes | OUT | No implementation/deployment; legal gambling and operator conflicts unresolved |
-| Backend | LOCKED | Node.js TypeScript + Fastify + Socket.IO, 20Hz authoritative room sim |
-| Persistence | LOCKED | PostgreSQL + Drizzle, single in-memory active room server for demo |
-| Team | LOCKED | Three developers; shared types/event schemas merged before branch work |
+| D01 | Monad TESTNET only, chainId=10143, test MON has no real economic value | Hackathon sandbox; no mainnet value path |
+| D02 | 3–4 **human** players; single room host is a player; no demo bot in P0 | Avoid false occupancy and opaque operator play |
+| D03 | Each funded player deposits equal exact native test MON; host chooses preset amount before room creation | Transparent equal contributions |
+| D04 | Entry immutable once contract room created; on-chain balances are source of truth | No frontend-only fictitious pool |
+| D05 | 100% of funded pool reserved for eligible winner; **0 platform fee** | Unambiguous demo |
+| D06 | Host creates room and funds own seat in one on-chain call; others `joinRoom` payable | Minimize transactions |
+| D07 | Wallet required for pool mode; guest practice is a **separate P1 flow** with no deposits or payout | Payout must have a known address |
+| D08 | Backend controls authoritative gameplay and winner; settlement key is trusted; never claim trustless fairness | Short 6-hour build cannot prove game state on chain |
+| D09 | `settle` credits a **claimable prize**; the backend auto-triggers permissionless `payout(roomId)` to winner, with manual recovery trigger; use checks-effects-interactions | Safe payout and clear status distinctions |
+| D10 | Cancel/expire enters refundable state; each participant **pulls** their own exact deposit once | No operator dependency for recovery after timeout |
+| D11 | A funded unresolved room is refundable after a bounded resolution deadline | Funds cannot be indefinitely locked by dead backend |
+| D12 | Separate `GameStatus`, `EscrowStatus`, `TransferStatus`; do NOT reuse v0.4's five-value status for chain | Prevent frontend/contract state drift |
+| D13 | Admission locks when game countdown begins; contract must also be fully funded first | No phantom/late seat |
+| D14 | Deploy single instance, in-memory live game, **reconstruct contract state from reads/logs** | Keep scope small; deposits survive restart |
+| D15 | Room codes are 6 chars uppercase, avoid 0/O/1/I; contract key is `bytes32` unique per room; backend maps code→key | Human-friendly, collision-resistant |
+| D16 | No pooling of real value, no deposits on mainnet, no conversion/redemption | Hard product prohibition |
+| D17 | After 15 s lobby countdown, 3 players=20 s and 4 players=30 s *nominal gameplay* | Preserve v0.4 established mechanics |
+| D18 | No automatic unconditional `settle` before server emits authenticated result and reconciles funded wallet list | Prevent forged winner from client |
 
-## P0 release gates
-- [ ] One laptop + Android + iPhone can load same public game URL and join one room.
-- [ ] Two-thumb joystick and camera rotation work at the same time; RUN and PASS are usable.
-- [ ] Input and stamina validation server-side; no client winning claims.
-- [ ] Three participants can start, pass bomb, eliminate, and select unique winner.
-- [ ] Short-lived reconnect retains same seat and does not restart match.
-- [ ] Monad Testnet match result confirms once with valid explorer link.
-- [ ] Venue fallback plan tested (hotspot, QR, manual room code, local practice recording).
-- [ ] UI never claims mainnet prizes or real token transfers.
+## Timeouts (source of truth for pool defaults)
+- `ENTRY_MIN_WEI=10^15` (0.001 test MON), `ENTRY_MAX_WEI=10^16` (0.01 test MON), default 0.001, presets 0.001/0.005/0.01 test MON. Configurable only through a versioned shared-contract decision; the contract enforces bounds.
+- `FUNDING_WINDOW_SEC=600` from confirmed contract room creation.
+- `RESOLUTION_WINDOW_SEC=1200` from confirmed contract room creation (absolute; includes funding time). At expiration a funded but unsettled room may be canceled by **any caller** and refunded. Deadlines are UNIX seconds (EVM timestamps), not milliseconds.
+- P0 cancellation: contract operator may call `cancelRoom` for an outstanding non-settled room, providing a documented reason; host cannot arbitrarily cancel after funding. Any caller may call `expireUnfunded` or `expireUnresolved` once their deadlines pass.
+- If `settle` and `expireUnresolved` contend, whichever legally changes escrow state on chain first wins; the other must fail. App MUST reconcile receipt and read latest contract status before showing success.
 
-## P1 / P2
-- P1: disclosed test bot, last-three-seconds panic VFX, spectator camera polish, shrinking arena, sound, graphics auto-detection.
-- P2: actual testnet escrow with per-participant deposits, matching amount and permissionless refunds, achievement mint, cosmetics, tournaments.
+## Gameplay invariants frozen from v0.4
+`MIN_PLAYERS=3`, `MAX_PLAYERS=4`, `ARENA_RADIUS=7`, `PLAYER_RADIUS=.4`, `MAX_POSITION_RADIUS=6.6`, `WALK=4.5u/s`, `SPRINT=7u/s` provisional, `STAMINA_MAX=5`, drain `1/s`, regen delay `1500ms`, regen `1/s`, `BOMB_CYCLE=10s`, pass range `1.8u`, pass cooldown `700ms`, anti-return `1000ms`, countdown `15s`, reconnect grace `5000ms`, server sim `20Hz`, snapshots `15Hz`, pass timer never resets.
 
-## Remaining explicit design questions
-1. Does the room auto-start at exactly 3 ready, or does host press `START`? **Default:** auto after 15s quorum countdown.
-2. When 4th player attempts to join during 15s countdown? **Default:** queue/reject until next room; lock admissions at countdown start.
-3. On mobile RUN toggle, should tap-toggle persist while screen is focused? **Default:** yes, but force off at zero stamina, joystick release and focus loss.
-4. How to avoid spawn unfairness? **Default:** server distributes four spawn positions evenly around stage, random seed logged.
-5. What if only 2 human demo devices available? **Default:** test bot opt-in; not a substitute for 3-device crossplay QA.
+## Key trust / security assumptions
+- Only the designated server signer (`SETTLER_ROLE`) may settle. Address and role are public on chain. Owner/admin key is not kept in frontend; separate deployer/admin vs runtime signer. Limit deployer's powers; test only.
+- Winners MUST be an address in that room's **actual depositors**, with no empty, replaced, or duplicate player slots.
+- Rooms **cannot** finish/payout if on-chain funding count < selected seats.
+- Code-scanning a tx hash is not evidence until its **receipt** matches correct chain, contract, room, sender, value, success, and event. Never trust client-provided `funded=true`.
+- A player wallet may fund at most one seat of the same room (one wallet, one seat), but sybil across distinct wallets is out of scope. Do not claim sybil resistance.
 
-## Team execution reference
-See `AGENT_HANDOFF.md` for roles, merge gates, six-hour clock, and anti-conflict agent prompts.
+## Release trade-off / cut rule
+P0 **must** include secure funding, winner settlement, refund recovery, and multiplayer. If those cannot pass release gates, present a clearly labeled **UI/gameplay demo only** (no deposits) and mark testnet economic flow unfinished. NEVER cut refund while allowing deposits.
+
+## Hard exclusions
+Mainnet, real monetary stakes, platform rake, tokens convertible to value, hidden bots, provably fair game claims, VDF/ZK result verification, on-chain player movement, NFTs, ranking economy, testnet faucet bypass, referral schemes, unattended production operation.
