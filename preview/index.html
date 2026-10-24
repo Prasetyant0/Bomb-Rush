@@ -1,0 +1,226 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>BOMB RUSH — 3D asset preview</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #111024; overflow: hidden; }
+    #hud { position: fixed; top: 8px; left: 12px; color: #b9a7ff; font: 12px monospace; z-index: 10; }
+    #hud b { color: #f7f6ff; }
+    #labels { position: fixed; bottom: 8px; left: 12px; color: #63e8f2; font: 11px monospace; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="hud">BOMB RUSH assets — <b id="mode">lineup</b> — keys: [1] lineup · [2] bomb · [3] chase · [4] props</div>
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { createAvatar, createTargetRing, EXPRESSIONS, HATS } from "../src/assets/PlayerAvatar3D.js";
+    import { createBomb } from "../src/assets/BombModel.js";
+    import { createArena, createThirdPersonCamera } from "../src/assets/ArenaScene.js";
+    import { createProp, PROPS } from "../src/assets/Props3D.js";
+    import { PALETTE, PLAYER_PALETTES } from "../src/assets/style.js";
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(PALETTE.bg);
+
+    const persp = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 100);
+    const chaseCam = createThirdPersonCamera(innerWidth / innerHeight);
+    let activeCam = persp;
+
+    // 360° inspection: drag to orbit, scroll to zoom, resumes slow auto-spin after 2 s idle
+    const orbit = new OrbitControls(persp, renderer.domElement);
+    orbit.enableDamping = true;
+    orbit.autoRotate = true;
+    orbit.autoRotateSpeed = 1.0;
+    orbit.target.set(0, 1, 0);
+    orbit.maxPolarAngle = Math.PI * 0.55; // don't go under the floor
+    let idleTimer = 0;
+    orbit.addEventListener("start", () => {
+      orbit.autoRotate = false;
+      clearTimeout(idleTimer);
+    });
+    orbit.addEventListener("end", () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => (orbit.autoRotate = true), 2000);
+    });
+
+    // soft studio lighting like the reference sheets
+    const key = new THREE.DirectionalLight(0xffffff, 2.2);
+    key.position.set(4, 8, 5);
+    key.castShadow = true;
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0xb9a7ff, 0.8);
+    fill.position.set(-5, 3, 2);
+    scene.add(fill);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+
+    const COSTUMES = Object.keys(HATS);
+    let live = [];
+    let mode = "lineup";
+
+    function setMode(name, build, cam) {
+      for (const o of live) {
+        scene.remove(o);
+        o.label?.remove();
+      }
+      live = build();
+      activeCam = cam;
+      mode = name;
+      document.getElementById("mode").textContent = name;
+    }
+
+    function lineup() {
+      return () => {
+        const items = [];
+        COSTUMES.forEach((name, i) => {
+          const a = createAvatar({ costume: name, skin: i % 5, palette: i % 4, outfit: true });
+          a.position.set((i % 5 - 2) * 1.6, 0, Math.floor(i / 5) * 3.2 - 1.6);
+          scene.add(a);
+          items.push(a);
+        });
+        const label = document.createElement("div");
+        label.id = "labels";
+        label.textContent = COSTUMES.join(" · ");
+        document.body.appendChild(label);
+        items.forEach((a) => (a.label = label));
+        persp.position.set(0, 2.7, 9.6);
+        orbit.target.set(0, 1, 0);
+        return items;
+      };
+    }
+
+    function bombScene() {
+      const bomb = createBomb();
+      bomb.position.y = 1.1;
+      scene.add(bomb);
+      persp.position.set(0.8, 1.6, 3.2);
+      orbit.target.set(0, 1.1, 0);
+      return [bomb];
+    }
+
+    // overhead nameplate sprite (design.md §2: clear colored outfits + nameplates)
+    function nameplate(name, pal) {
+      const c = document.createElement("canvas");
+      c.width = 256; c.height = 64;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "rgba(33,26,57,0.75)";
+      ctx.beginPath(); ctx.roundRect(8, 8, 240, 48, 12); ctx.fill();
+      ctx.font = "bold 28px monospace";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = "#" + pal.accent.toString(16).padStart(6, "0");
+      ctx.fillText(name, 128, 33);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+      s.scale.set(1.4, 0.35, 1);
+      return s;
+    }
+
+    // chase: v0.3 third-person orbit-follow demo — 4 players walk a circle,
+    // camera damped-follows the bomb carrier, nearest passable player ringed.
+    function chaseScene() {
+      const items = [createArena()];
+      scene.add(items[0]);
+      const players = COSTUMES.slice(0, 4).map((costume, i) => {
+        const a = createAvatar({ costume, skin: i, palette: i });
+        a.userData.nameplate.add(nameplate(PLAYER_PALETTES[i].name, PLAYER_PALETTES[i]));
+        scene.add(a);
+        items.push(a);
+        return a;
+      });
+      // carrier (BLAZE): held bomb + overhead bomb glyph
+      const bomb = createBomb();
+      bomb.scale.setScalar(0.7);
+      bomb.position.set(0.3, 1.0, 0.5);
+      players[2].add(bomb);
+      const glyph = createBomb();
+      glyph.scale.setScalar(0.22);
+      glyph.position.y = 0.42; // sit above the nameplate, not on the text
+      players[2].userData.setBombGlyph(glyph);
+      // nearest passable target marker (server PASS_RANGE 1.8 u in real game)
+      const ring = createTargetRing();
+      players[3].add(ring);
+      items.push(ring, glyph);
+      persp.position.set(0, 4, 10);
+      orbit.target.set(0, 1, 0);
+      return items;
+    }
+
+    // props: reference "30 interactive props" sheet laid out in a grid
+    function propsScene() {
+      const names = Object.keys(PROPS);
+      const items = names.map((name, i) => {
+        const p = createProp(name);
+        p.position.set((i % 5 - 2) * 1.4, 0, Math.floor(i / 5) * 2.2 - 1.1);
+        scene.add(p);
+        return p;
+      });
+      persp.position.set(0, 2.4, 7.2);
+      orbit.target.set(0, 0.4, 0);
+      return items;
+    }
+
+    setMode("lineup", lineup(), persp);
+
+    addEventListener("keydown", (e) => {
+      if (e.key === "1") setMode("lineup", lineup(), persp);
+      if (e.key === "2") setMode("bomb", () => bombScene(), persp);
+      if (e.key === "3") setMode("chase", () => chaseScene(), chaseCam);
+      if (e.key === "4") setMode("props", () => propsScene(), persp);
+    });
+
+    const timer = new THREE.Timer();
+    timer.connect(document);
+
+    renderer.setAnimationLoop(() => {
+      timer.update();
+      const t = timer.getElapsed();
+      for (const o of live) {
+        o.userData?.tick?.(t);
+        o.userData?.face?.userData?.tick?.(t);
+        o.userData?.bombGlyph?.userData?.tick?.(t);
+      }
+      // lineup: cycle the expression sheet every 2 s
+      if (mode === "lineup") {
+        const name = EXPRESSIONS[Math.floor(t / 2) % EXPRESSIONS.length];
+        for (const o of live) o.userData?.face?.userData?.express?.(name);
+      }
+      // chase: players walk a circle (sprint pose every other lap), camera follows carrier
+      if (mode === "chase") {
+        const sprinting = Math.floor(t / 8) % 2 === 1;
+        live.slice(1, 5).forEach((a, i) => {
+          const ang = t * (sprinting ? 0.85 : 0.45) + (i * Math.PI) / 2;
+          a.position.set(Math.sin(ang) * 6, 0, Math.cos(ang) * 6);
+          a.rotation.y = ang + Math.PI / 2; // +z local faces the walk tangent
+          a.userData.pose({ moving: true, sprinting }, t + i);
+        });
+        chaseCam.userData.follow(live[3].position, timer.getDelta()); // live[3] = carrier
+      }
+      orbit.update(); // damping + autoRotate (no-op visuals for chase mode; chaseCam renders)
+      renderer.render(scene, activeCam);
+    });
+
+    addEventListener("resize", () => {
+      persp.aspect = chaseCam.aspect = innerWidth / innerHeight;
+      persp.updateProjectionMatrix();
+      chaseCam.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>

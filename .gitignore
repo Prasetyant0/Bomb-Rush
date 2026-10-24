@@ -1,3 +1,6 @@
+# Dependencies
+node_modules/
+
 # Foundry build output — regenerate with `forge build`.
 contracts/out/
 contracts/cache/
@@ -10,3 +13,8 @@ contracts/lib/
 
 # Never commit a signer key.
 contracts/.env
+
+# Local tooling artifacts
+.playwright-mcp/
+*.log
+.DS_Store

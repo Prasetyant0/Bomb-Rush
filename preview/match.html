@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BOMB RUSH — match</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #111024; overflow: hidden; }
+    #hint { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
+      color: #63e8f2; font: 12px monospace; z-index: 10; opacity: .8; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="hint">WASD move · SHIFT sprint · E pass · drag orbit · wheel zoom · R restart</div>
+  <script type="module">
+    import { bootMatch } from "../src/game/engine.js";
+    bootMatch(document.body);
+  </script>
+</body>
+</html>
