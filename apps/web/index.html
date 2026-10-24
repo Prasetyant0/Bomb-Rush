@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#090914" />
   <title>BOMB RUSH — Survive the Last Second</title>
-  <meta name="description" content="BOMBRUSH: satu bom, tiga sampai empat pemain, satu penyintas. Demo Monad testnet — tanpa nilai nyata." />
+  <meta name="description" content="BOMB RUSH: satu bom, tiga sampai empat pemain, satu penyintas. Demo Monad testnet tanpa nilai nyata." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
@@ -35,12 +35,12 @@
           <div class="eyebrow"><i></i>CARA TERCEPAT KEHILANGAN TEMAN</div>
           <h1>JANGAN<br /><span class="stroke">SAMPAI</span> <span class="orange">KENA.</span></h1>
           <div class="mini-line"><span class="orb"></span> PASS. LARI. BERTAHAN.</div>
-          <p class="hero-desc">Satu bom. Tiga sampai empat pemain. Sepuluh detik di ringan. operkan sebelum waktu habis — <strong>pemain terakhir yang hidup menang.</strong></p>
+          <p class="hero-desc">Satu bom, tiga sampai empat pemain. Kamu punya sepuluh detik untuk mengoper sebelum meledak. <strong>Yang terakhir hidup menang.</strong></p>
           <div class="hero-actions">
             <button class="btn primary xl" data-action="create">MASUK ARENA <span>↗</span></button>
             <button class="btn outline xl" data-action="how">CARA MAIN</button>
           </div>
-          <div class="hero-foot"><b>Buat squads.</b><span>Tanpa install. Panik murni. Credits demo tanpa nilai.</span></div>
+          <div class="hero-foot"><b>Buat squad.</b><span>Tanpa install, kredit demo tanpa nilai.</span></div>
         </div>
         <div class="hero-art" aria-hidden="true">
           <span class="art-back">BOOM!</span>
@@ -63,18 +63,20 @@
         <div class="eyebrow center"><i></i>GAMPANG BELAJAR, SUSAH BERTAHAN</div>
         <h2>TIGA LANGKAH MENUJU <span class="orange">GLORY.</span></h2>
         <div class="how-grid">
-          <article><span>01 /</span><h3>KUMPUL SQUAD</h3><p>Bikin room atau masuk kode enam karakter temanmu. 3–4 pemain. Itu saja.</p></article>
-          <article><span>02 /</span><h3>OPER BOM</h3><p>Kamu punya sepuluh detik. Kejar pemain lain, dekati, lalu oper. Timer tidak pernah reset.</p></article>
-          <article><span>03 /</span><h3>JADI YANG TERAKHIR</h3><p>Pemegang bom saat hitung nol gugur. Bertahanlah sampai kamu satu-satunya.</p></article>
+          <article><span>01 /</span><h3>KUMPUL SQUAD</h3><p>Bikin room atau masukkan kode enam karakter punya temanmu. 3–4 pemain.</p></article>
+          <article><span>02 /</span><h3>OPER BOM</h3><p>Kejar pemain lain, dekati sampai 1.8 unit, lalu oper. Timer bom tidak pernah reset.</p></article>
+          <article><span>03 /</span><h3>JADI YANG TERAKHIR</h3><p>Pemegang bom saat hitung nol gugur. Bertahan sampai kamu satu-satunya yang hidup.</p></article>
         </div>
-        <p class="legal"><span>◈</span> KREDITS ADALAH POIN DEMO VIRTUAL — TANPA NILAI_MONETARY, TANPA TRANSAKSI</p>
+        <p class="legal"><span>◈</span> KREDIT ADALAH POIN DEMO VIRTUAL, TANPA NILAI UANG DAN TANPA TRANSAKSI</p>
       </div>
     </section>
 
     <!-- ============ CREATE ============ -->
-    <section id="screen-create" class="screen flow narrow">
+    <section id="screen-create" class="screen flow create-flow">
       <div class="row-head"><button class="back" data-action="home">← KEMBALI</button><span class="step">01 / BUAT ROOM</span></div>
       <h2 class="screen-title">SET EL <span class="orange">STAGE.</span></h2>
+      <div class="lobby-split">
+      <div class="lobby-col">
       <div class="field">
         <label for="fNick">NICKNAME <small>YANG DILIHAT PEMAIN LAIN</small></label>
         <input id="fNick" maxlength="16" value="RUSHER" autocomplete="off" spellcheck="false" />
@@ -87,7 +89,7 @@
         </div>
       </div>
       <div class="field">
-        <label>ENTRY <small>KREDITS DEMO — TANPA NILAI</small></label>
+        <label>ENTRY <small>KREDIT DEMO, TANPA NILAI</small></label>
         <div class="grid4">
           <button class="chip" data-credits="10">10</button>
           <button class="chip" data-credits="50">50</button>
@@ -105,36 +107,54 @@
       </div>
       <div id="fErr" class="err" role="alert"></div>
       <button class="btn primary big block" data-action="confirm-create">BUAT ROOM <span>↗</span></button>
-      <p class="foot">Tanpa wallet. Semua data demo hanya ada di browser ini. Aturan gameplay 100% server-authoritative (sim lokal = modul yang sama di-host server).</p>
+      <p class="foot">Wallet opsional saat masuk arena. Semua data demo hanya ada di browser ini. Aturan gameplay dijalankan server; sim lokal memakai modul yang sama.</p>
+      </div>
+
+      <div class="preview-slot"></div>
+      </div>
     </section>
 
     <!-- ============ LOBBY ============ -->
-    <section id="screen-lobby" class="screen flow narrow">
+    <section id="screen-lobby" class="screen flow lobby-flow">
       <div class="row-head"><button class="back" data-action="home">← TINGGALKAN ROOM</button><span class="step live"><i></i> MENUNGGU LOBI</span></div>
       <div class="lobby-head">
-        <div><h2 class="screen-title">KALM <span class="orange">SEBELUM.</span></h2><p class="muted">Siapkan squad-mu. Ketika semua siap, kekacauan dimulai.</p></div>
+        <div><h2 class="screen-title">KALM <span class="orange">SEBELUM.</span></h2><p class="muted">Siapkan squad. Begitu semua siap, bom mulai berjalan.</p></div>
         <div class="codetile"><small>KODE ROOM</small><b id="lbCode">RUSH42</b><button class="copy" data-action="copy-code" title="Salin kode">⧉</button><small>bagikan ke teman</small></div>
       </div>
+      <div class="lobby-split">
+      <div class="lobby-col">
       <div class="panel">
-        <div class="panel-top"><span>PEMAIN <span id="lbOcc">04 / 04</span></span><span class="badge">LEAKS USER — idle seat</span></div>
+        <div class="panel-top"><span>PEMAIN <span id="lbOcc">04 / 04</span></span><span class="badge">KURSI BOT · LOKAL</span></div>
         <div id="lbSeats" class="seats"></div>
         <div class="lobby-cta">
           <button id="lbReady" class="btn primary big" data-action="toggle-ready">SAYA SIAP <span>↗</span></button>
           <button class="btn outline big" data-action="start">SKIP KE MATCH <span>↗</span></button>
         </div>
-        <p class="foot">UI demo: kursi lain dilokal, bukan pemain manusia. Angka hitung mundur 15 detik disimulasikan lokal.</p>
+        <p class="foot">Kursi lain diisi bot lokal, bukan pemain manusia. Hitung mundur 15 detik juga berjalan lokal.</p>
       </div>
       <div class="panel info">
         <div class="panel-top"><span>PENGATURAN MATCH</span><span>✳</span></div>
         <div class="kv"><span>MODE</span><b>LAST ONE STANDING</b></div>
         <div class="kv"><span>SEATS</span><b id="lbSeatsN">04</b></div>
-        <div class="kv"><span>ENTRY</span><b id="lbEntry">100 KREDITS DEMO</b></div>
-        <div class="kv"><span>POOL SIM</span><b id="lbPool">400 KREDITS DEMO</b></div>
+        <div class="kv"><span>ENTRY</span><b id="lbEntry">100 KREDIT DEMO</b></div>
+        <div class="kv"><span>POOL SIM</span><b id="lbPool">400 KREDIT DEMO</b></div>
         <div class="kv"><span>DURASI</span><b id="lbDur">30 DETIK NOMINAL</b></div>
         <div class="kv"><span>JARINGAN</span><b>MONAD TESTNET · 10143</b></div>
-        <div class="count"><small id="lbCountTitle">MENUNGGU SIAP</small><b id="lbCount">--</b><small id="lbCountHint">tekan "SAYA SIAP" untuk memulai</small></div>
+        <div class="count"><small id="lbCountTitle">MENUNGGU SIAP</small><b id="lbCount">--</b><small id="lbCountHint">tekan "SAYA SIAP" untuk mulai</small></div>
+      </div>
+      </div>
+
+      <div class="preview-slot"></div>
       </div>
     </section>
+
+    <!-- gameplay preview — one WebGL context, moved into whichever screen's
+         .preview-slot is on display (create + lobby) by app.js -->
+    <aside id="previewPanel" class="lobby-preview" aria-hidden="true" hidden>
+      <div class="panel-top"><span>SIMULASI GAMEPLAY</span><span class="live-dot"><i></i> LANGSUNG</span></div>
+      <div id="lbPreview" class="preview-frame"></div>
+      <div class="preview-foot">BOT BERMAIN DENGAN ATURAN YANG SAMA · TANPA SUARA</div>
+    </aside>
 
     <!-- ============ ARENA ============ -->
     <section id="screen-arena" class="screen">
@@ -152,7 +172,7 @@
         </div>
         <div class="hud round"><span id="hRound">ROUND 01 / 03</span><b></b><span id="hHolder" class="hot">PENGGUNA BOM: KAMU</span></div>
         <div id="hCue" class="cue"><b id="hCueT">SIAP-SIAP</b><span id="hCueS">SEPULUH DETIK PER BOM</span></div>
-        <div id="hAlert" class="alert">⚠ KAMUPEGANG BOM! <span>DEKATI &amp; OPER [E]</span></div>
+        <div id="hAlert" class="alert">⚠ KAMU PEGANG BOM! <span>DEKATI &amp; OPER [E]</span></div>
         <div id="hToast" class="gtoast"></div>
 
         <div class="hud bottom">
@@ -167,13 +187,13 @@
         <div id="oSpec" class="overlay spec hidden"><b>TERAKHIR <span>BERTAHAN.</span></b><small>KAMU GUGUR · MENONTON PENYINTAS</small></div>
         <div id="oPause" class="overlay pause hidden">
           <b>PAUSE</b>
-          <small>Demo lokal — bom tetap berjalan di server nyata.</small>
+          <small>Demo lokal. Di server nyata bom tetap berjalan saat kamu pause.</small>
           <div class="pcol">
             <button class="btn primary big" data-action="resume">LANJUTKAN <span>↗</span></button>
             <button class="btn outline big" data-action="lobby">KELUAR KE LOBI</button>
           </div>
         </div>
-        <div id="oRotate" class="overlay rotate hidden"><b>PUTAR KE <span>LANSKAP</span></b><small>Mode potret: overlay rotasi, tanpa memutus sesi.</small></div>
+        <div id="oRotate" class="overlay rotate hidden"><b>PUTAR KE <span>LANSKAP</span></b><small>Mode potret menampilkan overlay ini. Sesi tidak terputus.</small></div>
 
         <!-- touch controls (mobile landscape) -->
         <div id="touch" class="touch">
@@ -189,23 +209,23 @@
       <div class="eyebrow center"><i></i> MATCH SELESAI</div>
       <div id="rEmblem" class="emblem">★</div>
       <h1 id="rHead">TERAKHIR <span class="orange">BERTAHAN.</span></h1>
-      <p id="rSub" class="muted">Arena menobatkan penyintasnya. Siap balas dendam?</p>
+      <p id="rSub" class="muted">Arena punya penyintas baru. Siap balas dendam?</p>
       <div class="wintile">
-        <small>peenang ARENA</small>
+        <small>PEMENANG ARENA</small>
         <i id="rAva">J</i>
         <b id="rName">JINX</b>
         <small id="rDesc">JUARA MATCH LOKAL INI</small>
       </div>
       <div class="mets">
         <div><small>TIPE</small><b id="rMode">4-PLAYER SURVIVAL</b></div>
-        <div><small>POOL SIMULASI</small><b id="rPool">400</b><span>KREDITS DEMO · TANPA NILAI</span></div>
-        <div><small>CATATAN BLOCKCHAIN</small><b>BELUM DICATAT</b><span>TANPA BACKEND — STATUS JUJUR</span></div>
+        <div><small>POOL SIMULASI</small><b id="rPool">400</b><span>KREDIT DEMO, TANPA NILAI</span></div>
+        <div><small>CATATAN BLOCKCHAIN</small><b>BELUM DICATAT</b><span>TIDAK ADA TX YANG DIBUAT</span></div>
       </div>
       <div class="ract">
         <button class="btn primary big" data-action="rematch">MAIN LAGI <span>↗</span></button>
         <button class="btn outline big" data-action="home">KEMBALI KE HOME</button>
       </div>
-      <p class="legal">✳ Hasil disimulasikan di-browser — bukan hasil Monad terverifikasi maupun sesi multiplayer nyata.</p>
+      <p class="legal">✳ Hasil disimulasikan di browser, bukan hasil Monad terverifikasi dan bukan sesi multiplayer nyata.</p>
     </section>
   </main>
 
@@ -213,14 +233,31 @@
   <div id="modal" class="modal hidden">
     <div class="mback" data-action="close-modal"></div>
     <div class="mbody">
-      <div class="mtop"><span>GIS PASUKAN</span><button data-action="close-modal">✕</button></div>
+      <div class="mtop"><span>CARA MAIN</span><button data-action="close-modal">✕</button></div>
       <h2>KENALI <span class="orange">RULES.</span></h2>
-      <p>Tiga–empat kontestan. Bom panas berpindah. Saat hitung nol, pemegang gugur. Ulangi sampai satu penyintas.</p>
-      <div class="mrow"><span>01</span><div><b>BOM 10 DETIK</b><small>Tidak pernah reset saat dioper. Dekati penyintas lain dulu.</small></div></div>
-      <div class="mrow"><span>02</span><div><b>JARAK OPER 1.8 UNIT</b><small>Server memilih target terdekat yang eligible. Cooldown pass 0.7 detik, anti-return 1 detik.</small></div></div>
-      <div class="mrow"><span>03</span><div><b>STAMINA 5 BAR</b><small>Lari = 1 bar/detik. Setelah berhenti 1.5 detik, regen 1 bar/detik. Habis = paksa jalan.</small></div></div>
+      <p>Tiga sampai empat pemain, satu bom yang berpindah tangan. Saat hitung nol, pemegang bom gugur. Ulangi sampai tersisa satu.</p>
+      <div class="mrow"><span>01</span><div><b>BOM 10 DETIK</b><small>Timer tidak reset saat bom dioper. Dekati pemain lain dulu, baru oper.</small></div></div>
+      <div class="mrow"><span>02</span><div><b>JARAK OPER 1.8 UNIT</b><small>Server memilih target terdekat. Cooldown oper 0.7 detik, dan penerima tidak bisa mengembalikan bom selama 1 detik.</small></div></div>
+      <div class="mrow"><span>03</span><div><b>STAMINA 5 BAR</b><small>Lari memakai 1 bar per detik. Berhenti 1.5 detik lalu isi ulang 1 bar per detik. Stamina habis membuat kamu jalan paksa.</small></div></div>
       <div class="mkeys"><div><b>DESKTOP</b><p><kbd>WASD</kbd> gerak · <kbd>SHIFT</kbd> lari · <kbd>E</kbd> oper · <kbd>DRAG</kbd> kamera · <kbd>SCROLL</kbd> zoom</p></div><div><b>MOBILE · LANSKAP</b><p>Joystick kiri · LARI · OPER · swipe kanan untuk kamera</p></div></div>
       <button class="btn primary block" data-action="create">AYO MAIN <span>↗</span></button>
+    </div>
+  </div>
+
+  <!-- ============ WALLET GATE (shown on the way into the game) ============ -->
+  <div id="walletModal" class="modal hidden">
+    <div class="mback" data-action="close-wallet"></div>
+    <div class="mbody wallet-body">
+      <div class="mtop"><span>MASUK ARENA</span><button data-action="close-wallet">✕</button></div>
+      <h2>CONNECT <span class="orange">WALLET.</span></h2>
+      <p>Konek ke Monad Testnet 10143. Tanpa wallet kamu tetap bisa main, tapi hasilnya tidak dicatat ke chain.</p>
+      <div class="kv"><span>JARINGAN</span><b>MONAD TESTNET · 10143</b></div>
+      <div class="kv"><span>STATUS</span><b id="wStatus">BELUM TERHUBUNG</b></div>
+      <div class="kv"><span>ADDRESS</span><b id="wAddr">—</b></div>
+      <div id="wErr" class="err" role="alert"></div>
+      <button class="btn primary big block" data-action="wallet-connect">CONNECT WALLET <span>↗</span></button>
+      <button class="btn outline big block" data-action="wallet-skip">LANJUT TANPA WALLET</button>
+      <p class="foot">Hanya testnet. Tidak ada dana nyata, tidak ada deposit, tidak ada tx yang dibuat.</p>
     </div>
   </div>
 

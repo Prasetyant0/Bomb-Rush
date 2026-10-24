@@ -49,7 +49,7 @@ export function bootMatch(host) {
   let matchOpts = null, onFinish = null, toastFn = () => {};
   let snapPrev = [], snapCurr = [], lastRound = -1, snapAlpha = 0;
   let cueUntil = 0, cueText = "", cueSub = "";
-  let paused = false, retimer = 0;
+  let paused = false;
 
   // ---- input (per-match regenerable) ----
   const keys = {};
@@ -66,6 +66,9 @@ export function bootMatch(host) {
     onFinish = opts.onFinish || null;
     toastFn = opts.toast || (() => {});
     sfx.on = opts.soundOn !== false;
+    paused = false;
+    session.finished = false;
+    renderer.setAnimationLoop(loop);
     // clear previous matches
     disposeMatch();
     room = makeRoom(opts.code || "DEMO");
@@ -120,7 +123,9 @@ export function bootMatch(host) {
     }
     avatars = []; targetRing = bomb3d = glyph = null; disposables = [];
   }
-  function dispose() { disposeMatch(); renderer.setAnimationLoop(null); renderer.dispose(); }
+  // stop = leave the match but keep the renderer for the next one (it is built once)
+  function stop() { paused = true; renderer.setAnimationLoop(null); sfx.stopMusic(); sfx.stopAlarm(); clearKeys(); releaseTouches(); }
+  function dispose() { disposeMatch(); stop(); renderer.dispose(); }
 
   // session is created in the loop section below (module hoists `let session`)
 
@@ -248,9 +253,8 @@ export function bootMatch(host) {
   const timer = new THREE.Timer();
   timer.connect(document);
   let acc = 0;
-  let muted = false;
   let session = { r: null, finished: false };
-  renderer.setAnimationLoop(() => {
+  function loop() {
     if (paused || !session.r) return;
     timer.update();
     const dt = Math.min(timer.getDelta(), 0.1);
@@ -276,6 +280,7 @@ export function bootMatch(host) {
     if (session.r.over && !session.finished) {
       session.finished = true;
       const win = session.r.players.find((p) => p.alive);
+      sfx.stopMusic(); // arcade_chase off the moment the round ends, under the result screen too
       sfx.play("victory_fanfare"); // assets/music/victory_fanfare.mp3
       onFinish?.({
         seatCount: session.r.players.length,
@@ -285,7 +290,7 @@ export function bootMatch(host) {
         winnerColor: (matchOpts.seatColors || [])[win?.seat] || "#ac90e8",
       });
     }
-  });
+  }
 
   function tickInput() {
     const me = session.r.players[0];
@@ -428,7 +433,7 @@ export function bootMatch(host) {
 
   // ---- control surface consumed by app.js ----
   return {
-    newMatch, dispose,
+    newMatch, dispose, stop,
     pressPass, hudSync,
     setSound(on) { sfx.on = on; if (!on) sfx.stopAlarm(); },
     get room() { return session.r; },
